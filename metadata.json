@@ -1,0 +1,8 @@
+{
+  "name": "首版",
+  "description": "初始测试",
+  "requestFramePermissions": [
+    "serial"
+  ],
+  "majorCapabilities": []
+}
