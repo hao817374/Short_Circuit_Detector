@@ -9,12 +9,9 @@ import { Usb, PlugZap, Activity, BarChart2, Layers, Crosshair, CheckCircle2, Che
 
 type ViewMode = 'COMPASS' | 'DEBUG' | 'MULTI' | 'SETTINGS';
 
-const POINTS_PER_FRAME = 103;
-const WINDOW_SIZE = 32;
-const WINDOW_CENTER_OFFSET = Math.floor(WINDOW_SIZE / 2);
-const TRIM_COUNT = 6;
+import { getWindowAvg, WINDOW_SIZE, WINDOW_CENTER_OFFSET } from './utils/dsp';
 
-const sharedSortBuffer = new Float64Array(WINDOW_SIZE);
+const POINTS_PER_FRAME = 103;
 
 const DEFAULT_MAP = [
     { ref: 0, heading: 0 },      
@@ -144,27 +141,9 @@ function App() {
 
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
 
-  const getWindowAvg = (frame: DebugPoint[], startIndex: number, offset: number) => {
-      let count = 0;
-      for(let i=0; i<WINDOW_SIZE; i++) {
-          const idx = (startIndex + i) % frame.length;
-          if (frame[idx]) {
-              sharedSortBuffer[count++] = frame[idx].value + offset;
-          }
-      }
-      if (count < WINDOW_SIZE) return 0;
-      sharedSortBuffer.sort();
-      let sum = 0;
-      const end = WINDOW_SIZE - TRIM_COUNT;
-      for(let i=TRIM_COUNT; i<end; i++) {
-          sum += sharedSortBuffer[i];
-      }
-      return sum / (WINDOW_SIZE - TRIM_COUNT * 2);
-  };
-
   const commitFrame = () => {
      if (tempDebugBuffer.current.length >= POINTS_PER_FRAME) {
-         const newFrame = [...tempDebugBuffer.current.slice(0, POINTS_PER_FRAME)];
+         const newFrame = tempDebugBuffer.current.slice(0, POINTS_PER_FRAME);
          const { w1Idx, w2Idx, gOff, w1Off, w2Off, matrix, probeT, isZeroSampling: zeroSampling } = stateRef.current;
          
          const baseQ0 = getWindowAvg(newFrame, w1Idx, gOff);
@@ -232,14 +211,24 @@ function App() {
               return;
           }
 
-          const q0s = samples.map(s => s.q0);
-          const q1s = samples.map(s => s.q1);
-          
-          const avgQ0 = q0s.reduce((a, b) => a + b, 0) / q0s.length;
-          const avgQ1 = q1s.reduce((a, b) => a + b, 0) / q1s.length;
+          let sumQ0 = 0, sumQ1 = 0;
+          let minQ0 = Infinity, maxQ0 = -Infinity;
+          let minQ1 = Infinity, maxQ1 = -Infinity;
 
-          const rangeQ0 = Math.max(...q0s) - Math.min(...q0s);
-          const rangeQ1 = Math.max(...q1s) - Math.min(...q1s);
+          for (const s of samples) {
+              sumQ0 += s.q0;
+              sumQ1 += s.q1;
+              if (s.q0 < minQ0) minQ0 = s.q0;
+              if (s.q0 > maxQ0) maxQ0 = s.q0;
+              if (s.q1 < minQ1) minQ1 = s.q1;
+              if (s.q1 > maxQ1) maxQ1 = s.q1;
+          }
+
+          const avgQ0 = sumQ0 / samples.length;
+          const avgQ1 = sumQ1 / samples.length;
+
+          const rangeQ0 = maxQ0 - minQ0;
+          const rangeQ1 = maxQ1 - minQ1;
 
           // Stability Check: 
           // If fluctuation exceeds 1000 units (3 orders of magnitude), fail.
@@ -580,8 +569,12 @@ function App() {
   // Adaptive scaling for the calibration preview
   const previewBounds = useMemo(() => {
     if (debugData.length === 0) return { min: 0, max: 100, range: 100 };
-    const vals = debugData.map(p => p.value + globalOffset);
-    const minVal = Math.min(...vals), maxVal = Math.max(...vals);
+    let minVal = Infinity, maxVal = -Infinity;
+    for (const p of debugData) {
+        const v = p.value + globalOffset;
+        if (v < minVal) minVal = v;
+        if (v > maxVal) maxVal = v;
+    }
     const range = Math.max(50, (maxVal - minVal) * 1.5);
     const mid = (maxVal + minVal) / 2;
     return { min: mid - range / 2, max: mid + range / 2, range };

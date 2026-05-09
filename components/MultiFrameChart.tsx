@@ -35,8 +35,11 @@ export const MultiFrameChart: React.FC<MultiFrameChartProps> = ({ frames, isPaus
   const { min, max } = useMemo(() => {
     if (allPoints.length === 0) return { min: 0, max: 100 };
     if (isAutoCheck) {
-      let dataMin = Math.min(...allPoints.map(p => p.value));
-      let dataMax = Math.max(...allPoints.map(p => p.value));
+      let dataMin = Infinity, dataMax = -Infinity;
+      for (const p of allPoints) {
+          if (p.value < dataMin) dataMin = p.value;
+          if (p.value > dataMax) dataMax = p.value;
+      }
       const range = dataMax - dataMin || 100;
       return { min: Math.floor(dataMin - range * 0.2), max: Math.ceil(dataMax + range * 0.2) };
     } else {

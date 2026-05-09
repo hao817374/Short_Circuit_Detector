@@ -1,6 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DebugPoint } from '../types';
+import { getWindowAvg } from '../utils/dsp';
 import { 
   Settings2, Pause, Play, GripHorizontal, 
   ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
@@ -31,8 +32,6 @@ interface DebugChartProps {
 }
 
 const POINTS_PER_FRAME = 103;
-const WINDOW_SIZE = 32;
-const TRIM_COUNT = 6; 
 
 const DIRECTION_UI_INFO = [
     { heading: 0, label: "NORTH", Icon: ArrowUp },
@@ -95,21 +94,8 @@ export const DebugChart: React.FC<DebugChartProps> = ({
     return contentHeight - padding.bottom - (normalized * availableHeight);
   };
 
-  const calculateWindowStats = (startIndex: number) => {
-    if (data.length === 0) return 0;
-    const values: number[] = [];
-    for (let i = 0; i < WINDOW_SIZE; i++) {
-        const p = data[(startIndex + i) % data.length];
-        if (p) values.push(p.value + globalOffset);
-    }
-    if (values.length < WINDOW_SIZE) return 0;
-    values.sort((a, b) => a - b);
-    const trimmed = values.slice(TRIM_COUNT, values.length - TRIM_COUNT);
-    return trimmed.length > 0 ? (trimmed.reduce((a, b) => a + b, 0) / trimmed.length) : 0;
-  };
-
-  const win1BaseVal = useMemo(() => calculateWindowStats(win1Index), [win1Index, data, globalOffset]);
-  const win2BaseVal = useMemo(() => calculateWindowStats(win2Index), [win2Index, data, globalOffset]);
+  const win1BaseVal = useMemo(() => getWindowAvg(data, win1Index, globalOffset), [win1Index, data, globalOffset]);
+  const win2BaseVal = useMemo(() => getWindowAvg(data, win2Index, globalOffset), [win2Index, data, globalOffset]);
 
   const rawQ0 = win1BaseVal + win1Offset;
   const rawQ1 = win2BaseVal + win2Offset;
