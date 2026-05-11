@@ -11,6 +11,7 @@ build/
 # IDE / Editor
 .vscode/
 .idea/
+.claude/
 *.swp
 *.swo
 .DS_Store
@@ -37,3 +38,6 @@ desktop.ini
 *.tmp
 *.bak
 *.old
+
+# Other
+CLAUDE.md
