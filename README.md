@@ -1,20 +1,19 @@
-<div align="center">
-<img width="1200" height="475" alt="GHBanner" src="https://github.com/user-attachments/assets/0aa67016-6eaf-458a-adb2-6e31a0763ed6" />
-</div>
+# 短路测试仪上位机软件
 
-# Run and deploy your AI Studio app
+这是一个基于 Electron + React + Tailwind CSS 开发的高精度短路测试仪上位机软件。
 
-This contains everything you need to run your app locally.
+## 主要功能
+- **实时波形显示**：高频采集并展示信号波形。
+- **空间解算算法**：采用矩阵变换与三角函数实现精准的角度测向。
+- **自动化校准**：支持零点校准与双点矩阵定标。
+- **离线支持**：完全本地化资源，支持无网络环境运行。
 
-View your app in AI Studio: https://ai.studio/apps/29acfd0d-6a80-46a3-9ae9-e074aaa74538
+## 开发与运行
+1. 安装依赖：`npm install`
+2. 启动开发模式：`npm run dev`
+3. 启动 Electron 调试：`npm run electron:dev`
+4. 打包发布：`npm run electron:build`
 
-## Run Locally
-
-**Prerequisites:**  Node.js
-
-
-1. Install dependencies:
-   `npm install`
-2. Set the `GEMINI_API_KEY` in [.env.local](.env.local) to your Gemini API key
-3. Run the app:
-   `npm run dev`
+## 许可证
+本项目采用 **知识共享 署名-非商业性使用-禁止演绎 4.0 国际许可协议 (CC BY-NC-ND 4.0)**。
+仅供个人学习与研究使用，**严禁用于任何商业用途**。
