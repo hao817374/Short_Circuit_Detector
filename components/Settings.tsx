@@ -28,6 +28,9 @@ interface SettingsProps {
   probeThreshold: number;
   setProbeThreshold: (v: number) => void;
 
+  isDeveloperMode: boolean;
+  setIsDeveloperMode: (v: boolean) => void;
+
   onClose: () => void;
 }
 
@@ -42,6 +45,7 @@ export const Settings: React.FC<SettingsProps> = ({
   win1Offset, setWin1Offset,
   win2Offset, setWin2Offset,
   probeThreshold, setProbeThreshold,
+  isDeveloperMode, setIsDeveloperMode,
   onClose
 }) => {
 
@@ -55,6 +59,7 @@ export const Settings: React.FC<SettingsProps> = ({
   const [localWin1Offset, setLocalWin1Offset] = useState(win1Offset);
   const [localWin2Offset, setLocalWin2Offset] = useState(win2Offset);
   const [localProbeThreshold, setLocalProbeThreshold] = useState(probeThreshold);
+  const [localDevMode, setLocalDevMode] = useState(isDeveloperMode);
 
   const [isSaved, setIsSaved] = useState(false);
 
@@ -68,7 +73,8 @@ export const Settings: React.FC<SettingsProps> = ({
     setLocalWin1Offset(win1Offset);
     setLocalWin2Offset(win2Offset);
     setLocalProbeThreshold(probeThreshold);
-  }, [threshold, thresholdMin, thresholdMax, thresholdStep, globalOffset, win1Offset, win2Offset, probeThreshold]);
+    setLocalDevMode(isDeveloperMode);
+  }, [threshold, thresholdMin, thresholdMax, thresholdStep, globalOffset, win1Offset, win2Offset, probeThreshold, isDeveloperMode]);
 
   const handleSave = () => {
       setThreshold(localThreshold);
@@ -79,6 +85,7 @@ export const Settings: React.FC<SettingsProps> = ({
       setWin1Offset(localWin1Offset);
       setWin2Offset(localWin2Offset);
       setProbeThreshold(localProbeThreshold);
+      setIsDeveloperMode(localDevMode);
       
       onClose();
   };
@@ -122,7 +129,12 @@ export const Settings: React.FC<SettingsProps> = ({
     biasDesc: language === 'zh' ? "应用于所有ADC读数的基础偏移量，用于信号归零。" : "Base offset applied to all ADC readings to center the signal.",
     axis1: language === 'zh' ? "轴 1 (Q0)" : "Axis 1 (Q0)",
     axis2: language === 'zh' ? "轴 2 (Q1)" : "Axis 2 (Q1)",
-    note: language === 'zh' ? "注意：这些数值会偏移各轴的零点。建议在调试视图中使用“零点校准”功能自动获取。" : "Note: These values shift the zero-point of each axis. Use the \"ZERO CALIB\" function in the Debug view for automatic calibration."
+    note: language === 'zh' ? "注意：这些数值会偏移各轴的零点。建议在调试视图中使用“零点校准”功能自动获取。" : "Note: These values shift the zero-point of each axis. Use the \"ZERO CALIB\" function in the Debug view for automatic calibration.",
+
+    devMode: language === 'zh' ? "开发者模式" : "Developer Mode",
+    devDesc: language === 'zh' ? "开启后可查看实时波形调试视图并调整核心算法参数。非专业人员请勿随意修改。" : "Enable real-time waveform debugging and core algorithm parameter adjustment. Professionals only.",
+    advancedSection: language === 'zh' ? "高级算法参数" : "Advanced Algorithm Parameters",
+    basicSection: language === 'zh' ? "基础显示设置" : "Basic Display Settings",
   };
 
   return (
@@ -179,152 +191,174 @@ export const Settings: React.FC<SettingsProps> = ({
 
       <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
         
-        {/* Threshold Configuration Card */}
+        {/* Threshold Configuration Card (Basic) */}
         <div className="bg-white/80 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-800 rounded-3xl p-6 backdrop-blur-sm shadow-xl relative overflow-hidden group transition-colors duration-300">
-            <div className="absolute top-0 right-0 p-4 opacity-10 dark:opacity-10 dark:group-hover:opacity-20 transition-opacity">
-                <Gauge size={120} />
+            <div className="absolute top-0 right-0 p-4 opacity-5 transition-opacity">
+                <Sliders size={120} />
             </div>
             
             <div className="relative z-10">
-                <h3 className="text-lg font-bold text-cyan-600 dark:text-cyan-400 flex items-center gap-2 mb-6">
-                    <Sliders size={20} /> {t.cardThreshold}
-                </h3>
+                <div className="flex items-center justify-between mb-6">
+                    <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
+                        <Sliders size={20} className="text-cyan-500" /> {t.basicSection}
+                    </h3>
+                    <span className="text-[8px] font-black px-2 py-0.5 bg-cyan-500/10 text-cyan-500 rounded uppercase tracking-tighter">UI Controls</span>
+                </div>
 
                 <div className="space-y-6">
-                    <div className="bg-slate-100 dark:bg-slate-950/50 p-4 rounded-2xl border border-slate-200 dark:border-white/5 transition-colors duration-300">
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t.initThreshold}</label>
-                        <div className="flex items-center gap-4">
-                            <input 
-                                type="range" 
-                                min={localThresholdMin} max={localThresholdMax} step={localThresholdStep}
-                                value={localThreshold}
-                                onChange={(e) => setLocalThreshold(Number(e.target.value))}
-                                className="flex-grow h-2 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
-                            />
-                            <input 
-                                type="number" 
-                                value={localThreshold}
-                                onChange={(e) => setLocalThreshold(Number(e.target.value))}
-                                className="w-20 bg-white dark:bg-slate-900 border border-cyan-500/30 rounded-lg py-1 px-2 text-right font-mono text-cyan-600 dark:text-cyan-400 font-bold outline-none focus:border-cyan-500 transition-colors"
-                            />
+                    <div className="bg-slate-100 dark:bg-slate-950/50 p-5 rounded-2xl border border-slate-200 dark:border-white/5 transition-colors duration-300">
+                        <div className="flex justify-between items-end mb-3">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.initThreshold}</label>
+                            <span className="text-lg font-mono font-black text-cyan-600 dark:text-cyan-400">{localThreshold}</span>
                         </div>
+                        <input 
+                            type="range" 
+                            min={localThresholdMin} max={localThresholdMax} step={localThresholdStep}
+                            value={localThreshold}
+                            onChange={(e) => setLocalThreshold(Number(e.target.value))}
+                            className="w-full h-2 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                        />
                     </div>
 
                     <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t.sliderMin}</label>
+                        <div className="bg-white dark:bg-black/20 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">{t.sliderMin}</label>
                             <input 
                                 type="number" 
                                 value={localThresholdMin}
                                 onChange={(e) => setLocalThresholdMin(Number(e.target.value))}
-                                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl py-3 px-4 font-mono text-slate-800 dark:text-slate-300 outline-none focus:border-cyan-500/50 transition-colors"
+                                className="w-full bg-transparent font-mono text-xl font-bold text-slate-800 dark:text-slate-200 outline-none"
                             />
                         </div>
-                        <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t.sliderMax}</label>
+                        <div className="bg-white dark:bg-black/20 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">{t.sliderMax}</label>
                             <input 
                                 type="number" 
                                 value={localThresholdMax}
                                 onChange={(e) => setLocalThresholdMax(Number(e.target.value))}
-                                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl py-3 px-4 font-mono text-slate-800 dark:text-slate-300 outline-none focus:border-cyan-500/50 transition-colors"
+                                className="w-full bg-transparent font-mono text-xl font-bold text-slate-800 dark:text-slate-200 outline-none"
                             />
                         </div>
                     </div>
 
-                    <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 block">{t.step}</label>
-                        <div className="relative">
+                    <div className="p-4 bg-slate-50 dark:bg-black/10 rounded-2xl border border-dashed border-slate-300 dark:border-white/5">
+                         <div className="flex justify-between items-center">
+                            <div>
+                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t.step}</label>
+                                <p className="text-[8px] text-slate-400 dark:text-slate-500 mt-0.5">{t.stepDesc}</p>
+                            </div>
                             <input 
                                 type="number" 
                                 value={localThresholdStep}
                                 onChange={(e) => setLocalThresholdStep(Number(e.target.value))}
-                                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl py-3 px-4 font-mono text-slate-800 dark:text-slate-300 outline-none focus:border-cyan-500/50 transition-colors"
-                            />
-                            <div className="absolute right-4 top-1/2 -translate-y-1/2 text-[10px] text-slate-400 dark:text-slate-600 font-black pointer-events-none">UNIT</div>
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-2 px-1">{t.stepDesc}</p>
-                    </div>
-
-                     <div className="pt-4 border-t border-slate-300 dark:border-slate-800">
-                        <label className="text-[10px] font-black text-red-500 dark:text-red-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <AlertTriangle size={12} /> {t.probeTitle}
-                        </label>
-                         <div className="relative">
-                            <input 
-                                type="number" 
-                                value={localProbeThreshold}
-                                onChange={(e) => setLocalProbeThreshold(Number(e.target.value))}
-                                className="w-full bg-red-50 dark:bg-red-950/20 border border-red-300 dark:border-red-900/50 rounded-xl py-3 px-4 font-mono text-red-600 dark:text-red-400 font-bold outline-none focus:border-red-500/50 transition-colors"
+                                className="w-16 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg py-1 px-2 text-center font-mono font-bold text-slate-700 dark:text-slate-300 outline-none"
                             />
                          </div>
-                        <p className="text-[10px] text-slate-500 mt-2 px-1">{t.probeDesc}</p>
-                    </div>
-
-                </div>
-            </div>
-        </div>
-
-        {/* Calibration Configuration Card */}
-        <div className="bg-white/80 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-800 rounded-3xl p-6 backdrop-blur-sm shadow-xl relative overflow-hidden group transition-colors duration-300">
-            <div className="absolute top-0 right-0 p-4 opacity-10 dark:opacity-10 dark:group-hover:opacity-20 transition-opacity">
-                <Target size={120} />
-            </div>
-
-            <div className="relative z-10">
-                <h3 className="text-lg font-bold text-emerald-600 dark:text-emerald-400 flex items-center gap-2 mb-6">
-                    <Scale size={20} /> {t.cardCalib}
-                </h3>
-
-                <div className="space-y-6">
-                    <div>
-                        <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                            <Zap size={12} className="text-amber-500" /> {t.bias}
-                        </label>
-                        <div className="flex items-center gap-2">
-                            <input 
-                                type="number" 
-                                value={localGlobalOffset}
-                                onChange={(e) => setLocalGlobalOffset(Number(e.target.value))}
-                                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl py-3 px-4 font-mono text-xl font-bold text-amber-600 dark:text-amber-500 outline-none focus:border-amber-500/50 transition-colors"
-                            />
-                        </div>
-                        <p className="text-[10px] text-slate-500 mt-2 px-1">{t.biasDesc}</p>
-                    </div>
-
-                    <div className="h-px bg-slate-300 dark:bg-slate-800 my-4 transition-colors" />
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                <ArrowLeftRight size={12} className="text-emerald-500" /> {t.axis1}
-                            </label>
-                            <input 
-                                type="number" 
-                                value={localWin1Offset}
-                                onChange={(e) => setLocalWin1Offset(Number(e.target.value))}
-                                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl py-3 px-4 font-mono text-emerald-600 dark:text-emerald-400 font-bold outline-none focus:border-emerald-500/50 transition-colors"
-                            />
-                        </div>
-                        <div>
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                <ArrowLeftRight size={12} className="text-violet-500" /> {t.axis2}
-                            </label>
-                            <input 
-                                type="number" 
-                                value={localWin2Offset}
-                                onChange={(e) => setLocalWin2Offset(Number(e.target.value))}
-                                className="w-full bg-white dark:bg-slate-950 border border-slate-300 dark:border-slate-800 rounded-xl py-3 px-4 font-mono text-violet-600 dark:text-violet-400 font-bold outline-none focus:border-violet-500/50 transition-colors"
-                            />
-                        </div>
-                    </div>
-                    <div className="bg-blue-50 dark:bg-blue-500/10 border border-blue-200 dark:border-blue-500/20 rounded-xl p-3 transition-colors">
-                         <p className="text-[10px] text-blue-600 dark:text-blue-400 leading-relaxed">
-                            {t.note}
-                         </p>
                     </div>
                 </div>
             </div>
         </div>
+
+        {/* Developer Mode & Advanced Calibration */}
+        <div className="space-y-6">
+            {/* Developer Mode Toggle Card */}
+            <div className={`rounded-3xl p-6 border transition-all duration-500 ${localDevMode ? 'bg-cyan-600/5 border-cyan-500/30' : 'bg-slate-100/50 dark:bg-slate-900/40 border-slate-300 dark:border-white/5'}`}>
+                <div className="flex items-center justify-between gap-6">
+                    <div className="flex-grow">
+                        <div className="flex items-center gap-2 mb-1">
+                            <Activity size={18} className={localDevMode ? 'text-cyan-500' : 'text-slate-400'} />
+                            <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider">{t.devMode}</h3>
+                        </div>
+                        <p className="text-[10px] text-slate-500 dark:text-slate-500 leading-relaxed max-w-sm">{t.devDesc}</p>
+                    </div>
+                    <button 
+                        onClick={() => setLocalDevMode(!localDevMode)}
+                        className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none ${localDevMode ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-slate-800'}`}
+                    >
+                        <div className={`absolute top-1 left-1 bg-white w-5 h-5 rounded-full transition-transform duration-300 shadow-md ${localDevMode ? 'translate-x-7' : 'translate-x-0'}`} />
+                    </button>
+                </div>
+            </div>
+
+            {/* Advanced Algorithm Parameters (Visible only when Dev Mode is on) */}
+            {localDevMode ? (
+                <div className="bg-white/80 dark:bg-slate-900/60 border border-cyan-500/20 rounded-3xl p-6 backdrop-blur-sm shadow-xl relative overflow-hidden animate-in zoom-in-95 duration-300">
+                    <div className="absolute top-0 right-0 p-4 opacity-5">
+                        <Target size={120} />
+                    </div>
+
+                    <div className="relative z-10">
+                        <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2 mb-6">
+                            <Scale size={20} className="text-emerald-500" /> {t.advancedSection}
+                        </h3>
+
+                        <div className="space-y-6">
+                            <div className="grid grid-cols-1 gap-4">
+                                <div className="bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
+                                    <label className="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                        <Zap size={12} /> {t.bias}
+                                    </label>
+                                    <input 
+                                        type="number" 
+                                        value={localGlobalOffset}
+                                        onChange={(e) => setLocalGlobalOffset(Number(e.target.value))}
+                                        className="w-full bg-transparent font-mono text-2xl font-black text-amber-600 dark:text-amber-500 outline-none"
+                                    />
+                                    <p className="text-[8px] text-amber-600/60 dark:text-amber-500/40 mt-1 uppercase font-bold">{t.biasDesc}</p>
+                                </div>
+
+                                <div className="grid grid-cols-2 gap-4">
+                                    <div className="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 transition-all">
+                                        <label className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-2 block">{t.axis1}</label>
+                                        <input 
+                                            type="number" 
+                                            value={localWin1Offset}
+                                            onChange={(e) => setLocalWin1Offset(Number(e.target.value))}
+                                            className="w-full bg-transparent font-mono text-xl font-bold text-emerald-600 dark:text-emerald-500 outline-none"
+                                        />
+                                    </div>
+                                    <div className="bg-violet-500/5 dark:bg-violet-500/10 border border-violet-500/20 rounded-2xl p-4 transition-all">
+                                        <label className="text-[10px] font-black text-violet-600 dark:text-violet-500 uppercase tracking-widest mb-2 block">{t.axis2}</label>
+                                        <input 
+                                            type="number" 
+                                            value={localWin2Offset}
+                                            onChange={(e) => setLocalWin2Offset(Number(e.target.value))}
+                                            className="w-full bg-transparent font-mono text-xl font-bold text-violet-600 dark:text-violet-500 outline-none"
+                                        />
+                                    </div>
+                                </div>
+                            </div>
+
+                            <div className="pt-4 border-t border-slate-300 dark:border-slate-800">
+                                <label className="text-[10px] font-black text-red-500 dark:text-red-400 uppercase tracking-widest mb-2 flex items-center gap-2">
+                                    <AlertTriangle size={12} /> {t.probeTitle}
+                                </label>
+                                <input 
+                                    type="number" 
+                                    value={localProbeThreshold}
+                                    onChange={(e) => setLocalProbeThreshold(Number(e.target.value))}
+                                    className="w-full bg-transparent font-mono text-xl font-black text-red-600 dark:text-red-500 outline-none"
+                                />
+                                <p className="text-[8px] text-red-500/50 mt-1 uppercase font-bold">{t.probeDesc}</p>
+                            </div>
+
+                            <div className="bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
+                                 <p className="text-[9px] text-blue-600 dark:text-blue-400 leading-tight font-medium">
+                                    <AlertCircle size={10} className="inline mr-1 mb-0.5" /> {t.note}
+                                 </p>
+                            </div>
+                        </div>
+                    </div>
+                </div>
+            ) : (
+                <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-white/5 rounded-[2.5rem] bg-slate-50/30 dark:bg-black/10 transition-all group hover:bg-slate-50/50 dark:hover:bg-black/20">
+                    <AlertCircle className="text-slate-300 dark:text-slate-800 mb-4 transition-transform group-hover:scale-110 duration-500" size={48} />
+                    <p className="text-xs font-black text-slate-400 dark:text-slate-700 uppercase tracking-widest">Advanced parameters hidden</p>
+                    <p className="text-[9px] text-slate-300 dark:text-slate-800 mt-1">Enable Developer Mode to adjust core algorithms</p>
+                </div>
+            )}
+        </div>
+      </div>
 
       </div>
 

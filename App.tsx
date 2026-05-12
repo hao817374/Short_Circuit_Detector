@@ -8,7 +8,7 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { CompassData, SerialPort, DebugPoint, Language, ThemeMode } from './types';
 import { Usb, PlugZap, Activity, BarChart2, Layers, Crosshair, CheckCircle2, ChevronRight, Timer, AlertCircle, Eye, Zap, Waves, Signal, Scale, Compass as CompassIcon, Navigation, Settings2, Trash2, Target, Move } from 'lucide-react';
 
-type ViewMode = 'COMPASS' | 'DEBUG' | 'MULTI' | 'SETTINGS';
+type ViewMode = 'COMPASS' | 'CALIBRATION' | 'DEBUG' | 'SETTINGS';
 
 import { getWindowAvg, WINDOW_SIZE, WINDOW_CENTER_OFFSET } from './utils/dsp';
 
@@ -55,6 +55,7 @@ function App() {
   const [isConnecting, setIsConnecting] = useState(false);
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [skipWelcome, setSkipWelcome] = usePersistentState('cfg_skipWelcome', false);
+  const [isDeveloperMode, setIsDeveloperMode] = usePersistentState('cfg_isDevMode', false);
 
   // Auto-dismiss connection errors after 6 seconds
   useEffect(() => {
@@ -601,9 +602,12 @@ function App() {
 
   const texts = {
     title: language === 'zh' ? "短路测试仪" : "Short Circuit Tester",
-    remap: language === 'zh' ? "校准" : "CALIBRATE",
     disconnect: language === 'zh' ? "断开连接" : "DISCONNECT",
     connect: language === 'zh' ? "连接设备" : "CONNECT",
+    nav_compass: language === 'zh' ? "方位检测" : "DETECTION",
+    nav_calib: language === 'zh' ? "空间校准" : "CALIBRATION",
+    nav_debug: language === 'zh' ? "调试分析" : "DEBUG",
+    nav_settings: language === 'zh' ? "系统配置" : "SETTINGS",
   };
   
   // Calibration Modal Texts
@@ -758,23 +762,146 @@ function App() {
               </div>
           </div>
           <div className="flex items-center gap-4">
-              <button onClick={() => { setCalibRefVectors({ "NW": null, "SW": null }); setIsCalibrating2P(true); }} disabled={!connected} className="flex items-center gap-2 px-5 py-2.5 rounded-xl border border-cyan-500/30 bg-cyan-600/10 text-cyan-500 dark:text-cyan-400 text-[10px] font-black tracking-widest hover:bg-cyan-600/20 transition-all"><Scale size={14} /> {texts.remap}</button>
-              <nav className="bg-slate-200/50 dark:bg-slate-900/50 p-1 rounded-xl border border-slate-300/50 dark:border-white/5 flex items-center transition-colors duration-300">
-                  <button onClick={() => setViewMode('COMPASS')} className={`px-5 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all ${viewMode === 'COMPASS' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}>COMPASS</button>
-                  <button onClick={() => setViewMode('DEBUG')} className={`px-5 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all ${viewMode === 'DEBUG' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}>DEBUG</button>
-                  <button onClick={() => setViewMode('SETTINGS')} className={`px-3 py-1.5 rounded-lg text-[10px] font-black tracking-widest transition-all ${viewMode === 'SETTINGS' ? 'bg-cyan-600 text-white shadow-lg' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}>
+          <div className="flex items-center gap-4">
+              <nav className="bg-slate-200/50 dark:bg-slate-900/50 p-1 rounded-2xl border border-slate-300/50 dark:border-white/5 flex items-center transition-all duration-300 shadow-inner">
+                  <button 
+                    onClick={() => setViewMode('COMPASS')} 
+                    className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'COMPASS' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+                  >
+                      <span>{texts.nav_compass}</span>
+                      <span className="opacity-40 text-[8px] font-medium tracking-tight">DETECTION</span>
+                  </button>
+                  <button 
+                    onClick={() => setViewMode('CALIBRATION')} 
+                    className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'CALIBRATION' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+                  >
+                      <span>{texts.nav_calib}</span>
+                      <span className="opacity-40 text-[8px] font-medium tracking-tight">CALIBRATION</span>
+                  </button>
+                  
+                  {isDeveloperMode && (
+                      <button 
+                        onClick={() => setViewMode('DEBUG')} 
+                        className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'DEBUG' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+                      >
+                          <span>{texts.nav_debug}</span>
+                          <span className="opacity-40 text-[8px] font-medium tracking-tight">DEBUG</span>
+                      </button>
+                  )}
+
+                  <button 
+                    onClick={() => setViewMode('SETTINGS')} 
+                    className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'SETTINGS' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+                  >
                       <Settings2 size={16} />
                   </button>
               </nav>
+
+              <div className="w-px h-8 bg-slate-300 dark:bg-white/10 mx-2" />
+
               {connected ? (
-                  <button onClick={disconnectSerial} className="px-6 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-black tracking-widest rounded-xl border border-red-500/20">{texts.disconnect}</button>
+                  <button onClick={disconnectSerial} className="px-6 py-2.5 bg-red-500/10 hover:bg-red-500/20 text-red-500 text-[10px] font-black tracking-widest rounded-xl border border-red-500/20 transition-all">{texts.disconnect}</button>
               ) : (
-                  <button onClick={connectToPort} className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black tracking-widest rounded-xl shadow-xl flex items-center gap-2"><PlugZap size={15} /> {texts.connect}</button>
+                  <button onClick={connectToPort} className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black tracking-widest rounded-xl shadow-xl flex items-center gap-2 transition-all active:scale-95"><PlugZap size={15} /> {texts.connect}</button>
               )}
+          </div>
           </div>
       </header>
 
       <main className="flex-grow flex flex-col min-h-0 h-full p-6 relative overflow-hidden">
+        {viewMode === 'CALIBRATION' && (
+            <div className="flex-grow flex flex-col min-h-0 h-full p-4">
+                 <div className="flex-grow flex gap-6 min-h-0 h-full">
+                    <div className="flex-[2] bg-white dark:bg-slate-900/60 rounded-[2.5rem] border border-slate-300 dark:border-white/5 p-10 flex flex-col transition-colors shadow-2xl relative overflow-hidden">
+                        <div className="mb-10">
+                            <h2 className="text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-4">
+                                <Scale className="text-cyan-500" size={32} />
+                                {t_calib.title}
+                            </h2>
+                            <p className="text-xs text-slate-500 dark:text-slate-500 font-mono tracking-widest uppercase mt-2">Surface Vector Mapping & Normalization</p>
+                        </div>
+
+                        <div className="flex-grow flex flex-col gap-8">
+                            {/* Zero Calib Card */}
+                            <div className="bg-slate-50 dark:bg-black/20 rounded-3xl p-8 border border-slate-200 dark:border-white/5 transition-all">
+                                <h3 className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-3">
+                                    <Zap size={16} className="text-amber-500" />
+                                    {t_calib.zeroTitle}
+                                </h3>
+                                <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed font-medium">
+                                    {t_calib.zeroInstruction}
+                                </p>
+                                <button 
+                                    onClick={handleZeroCalibrate}
+                                    disabled={isZeroSampling}
+                                    className={`w-full py-4 rounded-2xl font-black tracking-widest uppercase text-xs transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${isZeroSampling ? 'bg-slate-300 dark:bg-slate-800 text-slate-500' : 'bg-amber-500 hover:bg-amber-400 text-white'}`}
+                                >
+                                    {isZeroSampling ? <Timer className="animate-spin" size={16} /> : <Target size={16} />}
+                                    {isZeroSampling ? t_calib.sampling : t_calib.zeroTitle}
+                                </button>
+                                {zeroCalibStatus && <p className="mt-3 text-[10px] font-bold text-center text-emerald-500 uppercase tracking-widest">{zeroCalibStatus}</p>}
+                            </div>
+
+                            {/* Direction Calib Card */}
+                            <div className="bg-slate-50 dark:bg-black/20 rounded-3xl p-8 border border-slate-200 dark:border-white/5 transition-all">
+                                <h3 className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-3">
+                                    <Navigation size={16} className="text-cyan-500" />
+                                    {t_calib.dirTitle}
+                                </h3>
+                                <div className="grid grid-cols-1 gap-4">
+                                    {["SW", "NW"].map((key) => {
+                                        const isCaptured = calibRefVectors[key as "SW" | "NW"] !== null;
+                                        const label = key === "SW" ? t_calib.btn1 : t_calib.btn2;
+                                        const isSampling = samplingKey === key;
+                                        return (
+                                            <button
+                                                key={key}
+                                                disabled={!connected || isSampling}
+                                                onClick={() => startSampling(key as "SW" | "NW")}
+                                                className={`group relative overflow-hidden h-16 rounded-2xl border-2 transition-all active:scale-95 flex items-center px-6 gap-4 ${isCaptured ? 'border-cyan-500/50 bg-cyan-600/10 text-cyan-600 dark:text-cyan-400' : 'border-slate-300 dark:border-white/10 hover:border-cyan-500/30'}`}
+                                            >
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isCaptured ? 'bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
+                                                    {isCaptured ? <CheckCircle2 size={16} /> : <Crosshair size={16} />}
+                                                </div>
+                                                <span className="text-[10px] font-black uppercase tracking-widest transition-colors">{label}</span>
+                                                {isSampling && <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 transition-all duration-200" style={{ width: `${sampleProgress}%` }}></div>}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        </div>
+
+                        <div className="mt-auto pt-10 flex gap-4 border-t border-slate-200 dark:border-white/5">
+                             <button onClick={resetCalibration} className="flex-1 py-4 rounded-2xl bg-red-100 dark:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 font-black hover:bg-red-200 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><Trash2 size={14} /> {t_calib.clear}</button>
+                             <button onClick={() => setViewMode('COMPASS')} disabled={!allCalibrated && !isCleared} className={`flex-[2] py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest shadow-xl active:scale-95 ${allCalibrated || isCleared ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600'}`}>{t_calib.confirm}</button>
+                        </div>
+                    </div>
+
+                    <div className="hidden lg:flex flex-1 bg-slate-200/50 dark:bg-black/40 p-1 rounded-[3rem] transition-all">
+                        <div className="flex-grow rounded-[2.8rem] border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-950 overflow-hidden relative shadow-inner flex flex-col">
+                             <div className="absolute top-8 left-8">
+                                 <h4 className="text-[10px] font-black text-slate-400 dark:text-slate-600 uppercase tracking-widest">Real-time Waveform</h4>
+                             </div>
+                             {debugData.length === 0 ? (
+                                <div className="flex-grow flex items-center justify-center text-slate-300 dark:text-slate-800 font-mono"><Signal className="animate-pulse" size={64} /></div>
+                             ) : (
+                                <div className="flex-grow p-12 flex flex-col">
+                                    <div className="text-center mb-8">
+                                        <h3 className="text-xl font-black text-cyan-600 dark:text-cyan-400 animate-pulse tracking-wide uppercase">{t_calib.waveTip}</h3>
+                                    </div>
+                                    <svg className="w-full h-full overflow-visible" viewBox="0 0 103 100" preserveAspectRatio="none">
+                                        <line x1="0" y1="50" x2="103" y2="50" stroke="currentColor" className="text-slate-300 dark:text-white/10 transition-colors" strokeWidth="0.5" />
+                                        <polyline fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={debugData.map((p, i) => `${i},${100 - ((p.value + globalOffset - previewBounds.min) / previewBounds.range) * 100}`).join(' ')} className="drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
+                                    </svg>
+                                </div>
+                             )}
+                        </div>
+                    </div>
+                 </div>
+            </div>
+        )}
+
         {viewMode === 'COMPASS' && (
             !connected && !skipWelcome ? (
                 <WelcomeScreen
@@ -830,6 +957,8 @@ function App() {
                     win2Offset={win2Offset} setWin2Offset={setWin2Offset}
                     probeThreshold={probeThreshold} setProbeThreshold={setProbeThreshold}
                     onClose={() => setViewMode('COMPASS')}
+                    isDeveloperMode={isDeveloperMode}
+                    setIsDeveloperMode={setIsDeveloperMode}
                 />
             </div>
         )}
