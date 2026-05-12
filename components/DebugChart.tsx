@@ -1,11 +1,11 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { DebugPoint } from '../types';
+import { DebugPoint, Language } from '../types';
 import { getWindowAvg } from '../utils/dsp';
 import { 
   Settings2, Pause, Play, GripHorizontal, 
   ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
-  Zap, Navigation, Target, AlertCircle, CheckCircle2, Loader2
+  Zap, Navigation, Target, AlertCircle, CheckCircle2, Loader2, ArrowLeft as BackIcon
 } from 'lucide-react';
 
 interface DebugChartProps {
@@ -29,6 +29,14 @@ interface DebugChartProps {
   onZeroCalibrate: () => void;
   isZeroSampling: boolean;
   zeroCalibStatus: 'IDLE' | 'SUCCESS' | 'FAILED';
+
+  // Spatial Calibration Props
+  onSpatialCalibrate: (step: 'NW' | 'SW') => void;
+  calibRefVectors: Record<string, { q0: number, q1: number } | null>;
+  samplingStep: string | null;
+
+  onBack: () => void;
+  language: Language;
 }
 
 const POINTS_PER_FRAME = 103;
@@ -51,7 +59,9 @@ export const DebugChart: React.FC<DebugChartProps> = ({
     win2Offset, onWin2OffsetChange,
     globalOffset, onGlobalOffsetChange,
     directionMap, calibMatrix,
-    onZeroCalibrate, isZeroSampling, zeroCalibStatus
+    onZeroCalibrate, isZeroSampling, zeroCalibStatus,
+    onSpatialCalibrate, calibRefVectors, samplingStep,
+    onBack, language
 }) => {
   const [draggingWindow, setDraggingWindow] = useState<1 | 2 | null>(null);
   const containerRef = useRef<HTMLDivElement>(null);
@@ -80,7 +90,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
 
   const padding = { top: 30, right: 30, bottom: 50, left: 80 }; 
   const contentWidth = Math.max(dimensions.width, 300);
-  const contentHeight = Math.max(dimensions.height, 240); // Optimized for 16:9 ratio
+  const contentHeight = Math.max(dimensions.height, 240); 
 
   const getX = (index: number) => {
     const availableWidth = Math.max(1, contentWidth - padding.left - padding.right);
@@ -147,7 +157,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
       const handleX = getX(startIndex);
       const isDragging = draggingWindow === id;
       return (
-          <g>
+          <g key={`win-${id}`}>
               <g className={`cursor-grab active:cursor-grabbing group/handle ${!isPaused ? 'opacity-20 pointer-events-none' : ''}`} onMouseDown={() => setDraggingWindow(id)} onTouchStart={() => setDraggingWindow(id)}>
                   <rect x={handleX - 15} y={padding.top - 20} width={30} height={contentHeight - padding.top - padding.bottom + 20} fill="transparent" />
                   <rect x={handleX - 12} y={padding.top - 20} width={24} height={18} rx={4} className={`${colorClass} ${isDragging ? 'fill-current' : 'fill-slate-950 stroke-current'} transition-all duration-200`} />
@@ -162,39 +172,86 @@ export const DebugChart: React.FC<DebugChartProps> = ({
   const pointsString = useMemo(() => data.map((p, i) => `${getX(i).toFixed(1)},${getY(p.value + globalOffset).toFixed(1)}`).join(' '), [data, min, max, contentWidth, contentHeight, globalOffset]);
   const areaPointsString = useMemo(() => data.length === 0 ? "" : `${getX(0)},${contentHeight-padding.bottom} ${pointsString} ${getX(data.length-1)},${contentHeight-padding.bottom}`, [pointsString, contentHeight, padding.bottom]);
 
+  const renderDSPWindowShadow = (startIndex: number, colorClass: string) => {
+    if (data.length === 0) return null;
+    const windowSize = 32;
+    const trimCount = 6; 
+    
+    const windowPoints: number[] = [];
+    for (let i = -16; i < 16; i++) {
+        const idx = (startIndex + i + POINTS_PER_FRAME) % POINTS_PER_FRAME;
+        if (data[idx]) windowPoints.push(data[idx].value + globalOffset);
+    }
+    if (windowPoints.length < windowSize) return null;
+
+    const sorted = [...windowPoints].sort((a, b) => a - b);
+    const validMin = sorted[trimCount];
+    const validMax = sorted[windowSize - 1 - trimCount];
+
+    const xStart = getX(startIndex - 16);
+    const xEnd = getX(startIndex + 16);
+    const yTop = getY(validMax);
+    const yBottom = getY(validMin);
+
+    return (
+        <rect 
+            key={`shadow-${startIndex}`}
+            x={Math.min(xStart, xEnd)} 
+            y={yTop} 
+            width={Math.abs(xEnd - xStart)} 
+            height={Math.max(1, yBottom - yTop)} 
+            className={`${colorClass} opacity-20 transition-all duration-300`} 
+        />
+    );
+  };
+
   return (
     <div className="w-full h-full flex flex-col gap-6 relative min-h-0">
-      {/* Control Panel with Instrument Gauges (RESTORED SIZE) */}
-      <div className="grid grid-cols-1 lg:grid-cols-[1fr_auto_1fr] gap-6 bg-slate-100/80 dark:bg-slate-900/60 border border-slate-300 dark:border-white/5 p-6 rounded-[2.5rem] backdrop-blur-2xl shrink-0 items-center shadow-2xl transition-colors duration-300">
+      <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto] gap-6 bg-slate-100/80 dark:bg-slate-900/60 border border-slate-300 dark:border-white/5 p-6 rounded-[2.5rem] backdrop-blur-2xl shrink-0 items-center shadow-2xl transition-colors duration-300">
          <div className="flex flex-col gap-4">
             <div className="flex items-center gap-3">
-                <div className="p-3 bg-white dark:bg-slate-800/80 rounded-2xl text-cyan-600 dark:text-cyan-400 border border-slate-300 dark:border-white/5"><Settings2 size={24} /></div>
-                <div className="flex gap-3">
-                  <button onClick={onTogglePause} className={`flex items-center gap-2 px-6 py-3 rounded-2xl border text-[11px] font-black tracking-widest transition-all ${isPaused ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-500 shadow-xl' : 'bg-white dark:bg-slate-800/50 border-slate-300 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                      {isPaused ? <Play size={16} fill="currentColor" /> : <Pause size={16} fill="currentColor" />} {isPaused ? "RESUME" : "PAUSE"}
+                <button 
+                    onClick={onBack}
+                    className="p-3 bg-white dark:bg-slate-800/80 rounded-2xl text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-lg group"
+                >
+                    <BackIcon size={24} className="group-hover:-translate-x-1 transition-transform" />
+                </button>
+                <div className="flex gap-2">
+                  <button onClick={onTogglePause} className={`flex items-center gap-2 px-5 py-3 rounded-2xl border text-[10px] font-black tracking-widest transition-all ${isPaused ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-500 shadow-xl' : 'bg-white dark:bg-slate-800/50 border-slate-300 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+                      {isPaused ? <Play size={14} fill="currentColor" /> : <Pause size={14} fill="currentColor" />} {isPaused ? "RESUME" : "PAUSE"}
                   </button>
-                  <button onClick={onZeroCalibrate} disabled={isZeroSampling} className={`flex items-center gap-2 px-6 py-3 rounded-2xl border transition-all text-[11px] font-black tracking-widest shadow-inner ${isZeroSampling ? 'bg-cyan-100 dark:bg-cyan-500/20 border-cyan-500 text-cyan-600 dark:text-cyan-400' : 'border-cyan-300 dark:border-cyan-500/40 bg-white dark:bg-cyan-600/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-600/20'}`}>
-                      {isZeroSampling ? <Loader2 size={16} className="animate-spin" /> : <Target size={16} />} 
+                  <button onClick={onZeroCalibrate} disabled={isZeroSampling} className={`flex items-center gap-2 px-5 py-3 rounded-2xl border transition-all text-[10px] font-black tracking-widest shadow-inner ${isZeroSampling ? 'bg-cyan-100 dark:bg-cyan-500/20 border-cyan-500 text-cyan-600 dark:text-cyan-400' : 'border-cyan-300 dark:border-cyan-500/40 bg-white dark:bg-cyan-600/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-600/20'}`}>
+                      {isZeroSampling ? <Loader2 size={14} className="animate-spin" /> : <Target size={14} />} 
                       {isZeroSampling ? "SAMPLING..." : "ZERO CALIB"}
                   </button>
                 </div>
             </div>
-            
+            <div className="flex items-center gap-2">
+                <button 
+                    onClick={() => onSpatialCalibrate('SW')} 
+                    disabled={!!samplingStep}
+                    className={`px-4 py-2 rounded-xl border text-[9px] font-black tracking-tighter transition-all flex items-center gap-2 ${samplingStep === 'SW' ? 'bg-emerald-500 text-white animate-pulse' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-white/10 text-slate-500 dark:text-emerald-500 hover:border-emerald-500/50'}`}
+                >
+                    <ArrowDownLeft size={12} /> {language === 'zh' ? '右下采集' : 'SW CALIB'}
+                    {calibRefVectors['SW'] && <span className="ml-1 opacity-60 font-mono">({calibRefVectors['SW'].q0.toFixed(0)})</span>}
+                </button>
+                <button 
+                    onClick={() => onSpatialCalibrate('NW')} 
+                    disabled={!!samplingStep}
+                    className={`px-4 py-2 rounded-xl border text-[9px] font-black tracking-tighter transition-all flex items-center gap-2 ${samplingStep === 'NW' ? 'bg-violet-500 text-white animate-pulse' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-white/10 text-slate-500 dark:text-violet-500 hover:border-violet-500/50'}`}
+                >
+                    <ArrowUpLeft size={12} /> {language === 'zh' ? '右上采集' : 'NW CALIB'}
+                    {calibRefVectors['NW'] && <span className="ml-1 opacity-60 font-mono">({calibRefVectors['NW'].q0.toFixed(0)})</span>}
+                </button>
+            </div>
             <div className="flex items-center gap-4">
                 <div className="flex items-center gap-3 bg-white dark:bg-slate-950/80 p-3 rounded-2xl border border-slate-300 dark:border-white/5 shadow-inner transition-colors duration-300">
                     <div className="flex items-center gap-2 pr-4 border-r border-slate-300 dark:border-white/5"><Zap size={16} className="text-amber-500" /><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Bias</span></div>
                     <input type="number" value={globalOffset} onChange={(e) => onGlobalOffsetChange(Number(e.target.value))} className="w-24 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-white/5 rounded-xl px-3 py-1 text-center font-mono text-[13px] outline-none text-cyan-600 dark:text-cyan-400 focus:border-cyan-500/50 transition-colors" />
                 </div>
-                {zeroCalibStatus !== 'IDLE' && (
-                    <div className={`flex items-center gap-2 px-4 py-2 rounded-xl text-[10px] font-black animate-in fade-in slide-in-from-left-2 ${zeroCalibStatus === 'SUCCESS' ? 'bg-emerald-500/10 text-emerald-500 border border-emerald-500/20' : 'bg-red-500/10 text-red-500 border border-red-500/20'}`}>
-                        {zeroCalibStatus === 'SUCCESS' ? <CheckCircle2 size={16} /> : <AlertCircle size={16} />}
-                        {zeroCalibStatus === 'SUCCESS' ? "BIAS CALIB" : "FAILED"}
-                    </div>
-                )}
             </div>
          </div>
 
-         {/* Restored 3 HUD Gauges - Larger Visual Presence */}
          <div className="flex justify-center items-center gap-10 lg:px-10">
             <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-800 shadow-[0_0_20px_rgba(0,0,0,0.1),inset_0_0_20px_rgba(0,0,0,0.03)] dark:shadow-[0_0_40px_rgba(0,0,0,0.6),inset_0_0_20px_rgba(255,255,255,0.03)] flex items-center justify-center transition-colors duration-300">
                  <div className="absolute top-3 text-[8px] font-black text-slate-400 dark:text-slate-600 tracking-widest uppercase font-mono">STATUS</div>
@@ -243,7 +300,6 @@ export const DebugChart: React.FC<DebugChartProps> = ({
          </div>
       </div>
 
-      {/* Waveform View Adjusted to optimize overall layout ratio to ~16:9 */}
       <div ref={containerRef} className="relative flex-grow min-h-[240px] max-h-[320px] w-full bg-slate-100 dark:bg-[#030712] border border-slate-300 dark:border-slate-800/60 rounded-[3rem] overflow-hidden shadow-2xl flex flex-col transition-colors duration-500">
          {data.length === 0 ? (
              <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-800 font-mono uppercase text-sm tracking-[0.4em] animate-pulse">Signal Monitoring Offline</div>
@@ -274,6 +330,10 @@ export const DebugChart: React.FC<DebugChartProps> = ({
                 </g>
                 <polygon points={areaPointsString} fill="url(#waveGradient)" />
                 <polyline points={pointsString} fill="none" stroke={isPaused ? "#f59e0b" : "#0ea5e9"} strokeWidth="3" strokeLinejoin="round" className="drop-shadow-[0_0_10px_rgba(14,165,233,0.3)] dark:drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
+                
+                {renderDSPWindowShadow(win1Index, "fill-emerald-500")}
+                {renderDSPWindowShadow(win2Index, "fill-violet-500")}
+
                 {renderWindowOverlay(win1Index, "text-emerald-600 dark:text-emerald-500 fill-emerald-600 dark:fill-emerald-500", 1)}
                 {renderWindowOverlay(win2Index, "text-violet-600 dark:text-violet-500 fill-violet-600 dark:fill-violet-500", 2)}
             </svg>

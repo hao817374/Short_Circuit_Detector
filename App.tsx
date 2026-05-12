@@ -938,6 +938,12 @@ function App() {
               onZeroCalibrate={handleZeroCalibrate}
               isZeroSampling={isZeroSampling}
               zeroCalibStatus={zeroCalibStatus}
+              // New Spatial Calibration & Navigation props
+              onSpatialCalibrate={startSampling}
+              calibRefVectors={calibRefVectors}
+              samplingStep={samplingStep}
+              onBack={() => setViewMode('SETTINGS')}
+              language={language}
             />
           </div>
         )}
@@ -955,6 +961,7 @@ function App() {
                     win2Offset={win2Offset} setWin2Offset={setWin2Offset}
                     probeThreshold={probeThreshold} setProbeThreshold={setProbeThreshold}
                     onClose={() => setViewMode('COMPASS')}
+                    onEnterDevMode={() => setViewMode('DEBUG')}
                     isDeveloperMode={isDeveloperMode}
                     setIsDeveloperMode={setIsDeveloperMode}
                 />

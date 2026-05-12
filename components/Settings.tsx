@@ -32,6 +32,7 @@ interface SettingsProps {
   setIsDeveloperMode: (v: boolean) => void;
 
   onClose: () => void;
+  onEnterDevMode: () => void;
 }
 
 export const Settings: React.FC<SettingsProps> = ({
@@ -46,8 +47,9 @@ export const Settings: React.FC<SettingsProps> = ({
   win2Offset, setWin2Offset,
   probeThreshold, setProbeThreshold,
   isDeveloperMode, setIsDeveloperMode,
-  onClose
+  onClose, onEnterDevMode
 }) => {
+  const [showDevWarning, setShowDevWarning] = useState(false);
 
   // Local State for Buffering Changes
   const [localThreshold, setLocalThreshold] = useState(threshold);
@@ -138,8 +140,44 @@ export const Settings: React.FC<SettingsProps> = ({
   };
 
   return (
-    <div className="w-full max-w-4xl mx-auto p-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
+    <div className="w-full max-w-5xl mx-auto p-6 animate-in fade-in slide-in-from-bottom-4 duration-500 pb-32">
       
+      {/* Warning Modal for Developer Mode */}
+      {showDevWarning && (
+        <div className="fixed inset-0 z-[100] flex items-center justify-center p-6 bg-slate-900/60 backdrop-blur-sm animate-in fade-in duration-300">
+            <div className="w-full max-w-md bg-white dark:bg-slate-900 border border-slate-200 dark:border-white/10 rounded-[2.5rem] p-10 shadow-2xl animate-in zoom-in-95 duration-300">
+                <div className="w-20 h-20 bg-amber-500/10 rounded-3xl flex items-center justify-center mb-8 mx-auto border border-amber-500/20">
+                    <AlertTriangle className="text-amber-500" size={40} />
+                </div>
+                <h3 className="text-xl font-black text-slate-900 dark:text-white text-center mb-4 uppercase tracking-tight">
+                    {language === 'zh' ? '进入开发者模式？' : 'Enter Developer Mode?'}
+                </h3>
+                <p className="text-slate-500 dark:text-slate-400 text-sm text-center leading-relaxed mb-10 font-medium">
+                    {language === 'zh' 
+                        ? '开发者模式允许修改底层核心算法参数。不当的设置可能导致测试结果严重偏差甚至硬件损坏。非专业人员请勿继续。' 
+                        : 'Developer mode allows modification of core algorithms. Incorrect settings may cause significant measurement errors or hardware issues. Authorized personnel only.'}
+                </p>
+                <div className="flex gap-4">
+                    <button 
+                        onClick={() => setShowDevWarning(false)}
+                        className="flex-1 py-4 rounded-2xl bg-slate-100 dark:bg-white/5 text-slate-600 dark:text-slate-400 font-black text-[10px] tracking-widest uppercase hover:bg-slate-200 dark:hover:bg-white/10 transition-all"
+                    >
+                        {language === 'zh' ? '取消' : 'CANCEL'}
+                    </button>
+                    <button 
+                        onClick={() => {
+                            setShowDevWarning(false);
+                            onEnterDevMode();
+                        }}
+                        className="flex-1 py-4 rounded-2xl bg-amber-500 text-white font-black text-[10px] tracking-widest uppercase shadow-xl hover:bg-amber-400 transition-all active:scale-95"
+                    >
+                        {language === 'zh' ? '确认进入' : 'CONFIRM'}
+                    </button>
+                </div>
+            </div>
+        </div>
+      )}
+
       <div className="flex items-center justify-between mb-8">
         <div className="flex items-center gap-4">
             <div className="p-4 bg-slate-200 dark:bg-slate-800/50 rounded-2xl border border-slate-300 dark:border-white/5">
@@ -150,214 +188,125 @@ export const Settings: React.FC<SettingsProps> = ({
                 <p className="text-slate-500 font-mono text-xs uppercase tracking-widest mt-1">{t.subtitle}</p>
             </div>
         </div>
+
         
         <div className="flex items-center gap-4">
-            <div className="flex bg-slate-200 dark:bg-slate-900 rounded-lg p-1 border border-slate-300 dark:border-white/10">
+            <div className="flex bg-slate-200 dark:bg-slate-900 rounded-xl p-1 border border-slate-300 dark:border-white/10">
                 <button 
                     onClick={() => setThemeMode('light')} 
-                    className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-bold transition-all ${themeMode === 'light' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${themeMode === 'light' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
-                    <Sun size={14} /> {language === 'zh' ? '日间' : 'Light'}
+                    <Sun size={14} /> {language === 'zh' ? '日间' : 'LIGHT'}
                 </button>
                 <button 
                     onClick={() => setThemeMode('dark')} 
-                    className={`flex items-center gap-1 px-3 py-1 rounded text-xs font-bold transition-all ${themeMode === 'dark' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${themeMode === 'dark' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
-                    <Moon size={14} /> {language === 'zh' ? '夜间' : 'Dark'}
+                    <Moon size={14} /> {language === 'zh' ? '夜间' : 'DARK'}
                 </button>
             </div>
-            <div className="flex bg-slate-200 dark:bg-slate-900 rounded-lg p-1 border border-slate-300 dark:border-white/10">
+            <div className="flex bg-slate-200 dark:bg-slate-900 rounded-xl p-1 border border-slate-300 dark:border-white/10">
                 <button 
                     onClick={() => setLanguage('en')} 
-                    className={`px-3 py-1 rounded text-xs font-bold transition-all ${language === 'en' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    className={`px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${language === 'en' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
                     EN
                 </button>
                 <button 
                     onClick={() => setLanguage('zh')} 
-                    className={`px-3 py-1 rounded text-xs font-bold transition-all ${language === 'zh' ? 'bg-white dark:bg-slate-700 text-slate-800 dark:text-white shadow' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                    className={`px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${language === 'zh' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
                     中文
                 </button>
             </div>
             <button 
                 onClick={handleResetDefaults}
-                className="flex items-center gap-2 px-4 py-2 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition-all text-xs font-bold tracking-wider border border-slate-300 dark:border-white/5"
+                className="flex items-center gap-2 px-5 py-3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition-all text-[10px] font-black tracking-widest border border-slate-300 dark:border-white/5"
             >
                 <RotateCcw size={14} /> {t.reset}
+            </button>
+            <button 
+                onClick={() => setShowDevWarning(true)}
+                className="flex items-center gap-2 px-5 py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-500 rounded-xl transition-all text-[10px] font-black tracking-widest border border-amber-500/30 shadow-inner group"
+            >
+                <Activity size={14} className="group-hover:animate-pulse" /> {t.devMode}
             </button>
         </div>
       </div>
 
-      <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+      <div className="space-y-6">
         
-        {/* Threshold Configuration Card (Basic) */}
-        <div className="bg-white/80 dark:bg-slate-900/60 border border-slate-300 dark:border-slate-800 rounded-3xl p-6 backdrop-blur-sm shadow-xl relative overflow-hidden group transition-colors duration-300">
-            <div className="absolute top-0 right-0 p-4 opacity-5 transition-opacity">
-                <Sliders size={120} />
-            </div>
-            
-            <div className="relative z-10">
-                <div className="flex items-center justify-between mb-6">
-                    <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2">
-                        <Sliders size={20} className="text-cyan-500" /> {t.basicSection}
-                    </h3>
-                    <span className="text-[8px] font-black px-2 py-0.5 bg-cyan-500/10 text-cyan-500 rounded uppercase tracking-tighter">UI Controls</span>
+        {/* Simplified Basic Settings Card */}
+        <div className="bg-white/80 dark:bg-slate-900/60 border border-slate-300 dark:border-white/5 rounded-[2.5rem] p-10 shadow-2xl backdrop-blur-xl transition-colors duration-300">
+            <div className="flex items-center gap-4 mb-10">
+                <div className="p-3 bg-cyan-500/10 rounded-2xl text-cyan-500 border border-cyan-500/20"><Sliders size={24} /></div>
+                <div>
+                    <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{t.basicSection}</h3>
+                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-0.5">Threshold & Range Parameters</p>
                 </div>
+            </div>
 
-                <div className="space-y-6">
-                    <div className="bg-slate-100 dark:bg-slate-950/50 p-5 rounded-2xl border border-slate-200 dark:border-white/5 transition-colors duration-300">
-                        <div className="flex justify-between items-end mb-3">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest">{t.initThreshold}</label>
-                            <span className="text-lg font-mono font-black text-cyan-600 dark:text-cyan-400">{localThreshold}</span>
+            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
+                <div className="space-y-8">
+                    <div className="bg-slate-50 dark:bg-black/20 p-8 rounded-3xl border border-slate-200 dark:border-white/5">
+                        <div className="flex justify-between items-end mb-4">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{t.initThreshold}</label>
+                            <span className="text-2xl font-mono font-black text-cyan-600 dark:text-cyan-400">{localThreshold}</span>
                         </div>
                         <input 
                             type="range" 
                             min={localThresholdMin} max={localThresholdMax} step={localThresholdStep}
                             value={localThreshold}
                             onChange={(e) => setLocalThreshold(Number(e.target.value))}
-                            className="w-full h-2 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500"
+                            className="w-full h-2.5 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 transition-all"
                         />
                     </div>
 
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="bg-white dark:bg-black/20 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">{t.sliderMin}</label>
+                    <div className="grid grid-cols-2 gap-6">
+                        <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">{t.sliderMin}</label>
                             <input 
                                 type="number" 
                                 value={localThresholdMin}
                                 onChange={(e) => setLocalThresholdMin(Number(e.target.value))}
-                                className="w-full bg-transparent font-mono text-xl font-bold text-slate-800 dark:text-slate-200 outline-none"
+                                className="w-full bg-transparent font-mono text-2xl font-black text-slate-800 dark:text-slate-200 outline-none"
                             />
                         </div>
-                        <div className="bg-white dark:bg-black/20 p-4 rounded-2xl border border-slate-200 dark:border-white/5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-2 block">{t.sliderMax}</label>
+                        <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
+                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">{t.sliderMax}</label>
                             <input 
                                 type="number" 
                                 value={localThresholdMax}
                                 onChange={(e) => setLocalThresholdMax(Number(e.target.value))}
-                                className="w-full bg-transparent font-mono text-xl font-bold text-slate-800 dark:text-slate-200 outline-none"
+                                className="w-full bg-transparent font-mono text-2xl font-black text-slate-800 dark:text-slate-200 outline-none"
                             />
                         </div>
                     </div>
+                </div>
 
-                    <div className="p-4 bg-slate-50 dark:bg-black/10 rounded-2xl border border-dashed border-slate-300 dark:border-white/5">
-                         <div className="flex justify-between items-center">
-                            <div>
-                                <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t.step}</label>
-                                <p className="text-[8px] text-slate-400 dark:text-slate-500 mt-0.5">{t.stepDesc}</p>
-                            </div>
-                            <input 
-                                type="number" 
-                                value={localThresholdStep}
-                                onChange={(e) => setLocalThresholdStep(Number(e.target.value))}
-                                className="w-16 bg-white dark:bg-slate-900 border border-slate-300 dark:border-white/10 rounded-lg py-1 px-2 text-center font-mono font-bold text-slate-700 dark:text-slate-300 outline-none"
-                            />
+                <div className="flex flex-col justify-between">
+                    <div className="p-8 bg-slate-50 dark:bg-black/20 rounded-3xl border border-slate-200 dark:border-white/5 flex items-center justify-between">
+                         <div className="max-w-[180px]">
+                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t.step}</label>
+                            <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed font-medium">{t.stepDesc}</p>
                          </div>
+                         <input 
+                            type="number" 
+                            value={localThresholdStep}
+                            onChange={(e) => setLocalThresholdStep(Number(e.target.value))}
+                            className="w-24 bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-white/10 rounded-2xl py-3 px-4 text-center font-mono text-xl font-black text-slate-800 dark:text-slate-200 outline-none focus:border-cyan-500/50 transition-all shadow-inner"
+                         />
+                    </div>
+
+                    <div className="mt-6 flex items-center gap-4 p-6 bg-amber-500/5 rounded-[2rem] border border-amber-500/10">
+                        <AlertCircle size={20} className="text-amber-500 flex-shrink-0" />
+                        <p className="text-[10px] text-amber-700/70 dark:text-amber-500/60 font-medium leading-relaxed uppercase tracking-wider">
+                            {language === 'zh' ? '基础显示设置仅影响 UI 交互，不改变仪器测量精度。' : 'Basic settings only affect UI interaction, not measurement accuracy.'}
+                        </p>
                     </div>
                 </div>
             </div>
         </div>
-
-        {/* Developer Mode & Advanced Calibration */}
-        <div className="space-y-6">
-            {/* Developer Mode Toggle Card */}
-            <div className={`rounded-3xl p-6 border transition-all duration-500 ${localDevMode ? 'bg-cyan-600/5 border-cyan-500/30' : 'bg-slate-100/50 dark:bg-slate-900/40 border-slate-300 dark:border-white/5'}`}>
-                <div className="flex items-center justify-between gap-6">
-                    <div className="flex-grow">
-                        <div className="flex items-center gap-2 mb-1">
-                            <Activity size={18} className={localDevMode ? 'text-cyan-500' : 'text-slate-400'} />
-                            <h3 className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-wider">{t.devMode}</h3>
-                        </div>
-                        <p className="text-[10px] text-slate-500 dark:text-slate-500 leading-relaxed max-w-sm">{t.devDesc}</p>
-                    </div>
-                    <button 
-                        onClick={() => setLocalDevMode(!localDevMode)}
-                        className={`relative w-14 h-7 rounded-full transition-colors duration-300 focus:outline-none ${localDevMode ? 'bg-cyan-500' : 'bg-slate-300 dark:bg-slate-800'}`}
-                    >
-                        <div className={`absolute top-1 left-1 bg-white w-5 h-5 rounded-full transition-transform duration-300 shadow-md ${localDevMode ? 'translate-x-7' : 'translate-x-0'}`} />
-                    </button>
-                </div>
-            </div>
-
-            {/* Advanced Algorithm Parameters (Visible only when Dev Mode is on) */}
-            {localDevMode ? (
-                <div className="bg-white/80 dark:bg-slate-900/60 border border-cyan-500/20 rounded-3xl p-6 backdrop-blur-sm shadow-xl relative overflow-hidden animate-in zoom-in-95 duration-300">
-                    <div className="absolute top-0 right-0 p-4 opacity-5">
-                        <Target size={120} />
-                    </div>
-
-                    <div className="relative z-10">
-                        <h3 className="text-lg font-black text-slate-800 dark:text-white flex items-center gap-2 mb-6">
-                            <Scale size={20} className="text-emerald-500" /> {t.advancedSection}
-                        </h3>
-
-                        <div className="space-y-6">
-                            <div className="grid grid-cols-1 gap-4">
-                                <div className="bg-amber-500/5 dark:bg-amber-500/10 border border-amber-500/20 rounded-2xl p-4">
-                                    <label className="text-[10px] font-black text-amber-600 dark:text-amber-500 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                        <Zap size={12} /> {t.bias}
-                                    </label>
-                                    <input 
-                                        type="number" 
-                                        value={localGlobalOffset}
-                                        onChange={(e) => setLocalGlobalOffset(Number(e.target.value))}
-                                        className="w-full bg-transparent font-mono text-2xl font-black text-amber-600 dark:text-amber-500 outline-none"
-                                    />
-                                    <p className="text-[8px] text-amber-600/60 dark:text-amber-500/40 mt-1 uppercase font-bold">{t.biasDesc}</p>
-                                </div>
-
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="bg-emerald-500/5 dark:bg-emerald-500/10 border border-emerald-500/20 rounded-2xl p-4 transition-all">
-                                        <label className="text-[10px] font-black text-emerald-600 dark:text-emerald-500 uppercase tracking-widest mb-2 block">{t.axis1}</label>
-                                        <input 
-                                            type="number" 
-                                            value={localWin1Offset}
-                                            onChange={(e) => setLocalWin1Offset(Number(e.target.value))}
-                                            className="w-full bg-transparent font-mono text-xl font-bold text-emerald-600 dark:text-emerald-500 outline-none"
-                                        />
-                                    </div>
-                                    <div className="bg-violet-500/5 dark:bg-violet-500/10 border border-violet-500/20 rounded-2xl p-4 transition-all">
-                                        <label className="text-[10px] font-black text-violet-600 dark:text-violet-500 uppercase tracking-widest mb-2 block">{t.axis2}</label>
-                                        <input 
-                                            type="number" 
-                                            value={localWin2Offset}
-                                            onChange={(e) => setLocalWin2Offset(Number(e.target.value))}
-                                            className="w-full bg-transparent font-mono text-xl font-bold text-violet-600 dark:text-violet-500 outline-none"
-                                        />
-                                    </div>
-                                </div>
-                            </div>
-
-                            <div className="pt-4 border-t border-slate-300 dark:border-slate-800">
-                                <label className="text-[10px] font-black text-red-500 dark:text-red-400 uppercase tracking-widest mb-2 flex items-center gap-2">
-                                    <AlertTriangle size={12} /> {t.probeTitle}
-                                </label>
-                                <input 
-                                    type="number" 
-                                    value={localProbeThreshold}
-                                    onChange={(e) => setLocalProbeThreshold(Number(e.target.value))}
-                                    className="w-full bg-transparent font-mono text-xl font-black text-red-600 dark:text-red-500 outline-none"
-                                />
-                                <p className="text-[8px] text-red-500/50 mt-1 uppercase font-bold">{t.probeDesc}</p>
-                            </div>
-
-                            <div className="bg-blue-500/5 dark:bg-blue-500/10 border border-blue-500/20 rounded-xl p-3">
-                                 <p className="text-[9px] text-blue-600 dark:text-blue-400 leading-tight font-medium">
-                                    <AlertCircle size={10} className="inline mr-1 mb-0.5" /> {t.note}
-                                 </p>
-                            </div>
-                        </div>
-                    </div>
-                </div>
-            ) : (
-                <div className="h-64 flex flex-col items-center justify-center border-2 border-dashed border-slate-300 dark:border-white/5 rounded-[2.5rem] bg-slate-50/30 dark:bg-black/10 transition-all group hover:bg-slate-50/50 dark:hover:bg-black/20">
-                    <AlertCircle className="text-slate-300 dark:text-slate-800 mb-4 transition-transform group-hover:scale-110 duration-500" size={48} />
-                    <p className="text-xs font-black text-slate-400 dark:text-slate-700 uppercase tracking-widest">Advanced parameters hidden</p>
-                    <p className="text-[9px] text-slate-300 dark:text-slate-800 mt-1">Enable Developer Mode to adjust core algorithms</p>
-                </div>
-            )}
-      </div>
       </div>
 
       {/* Floating Save Button */}
