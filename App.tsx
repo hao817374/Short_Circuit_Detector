@@ -4,6 +4,7 @@ import { Compass } from './components/Compass';
 import { DebugChart } from './components/DebugChart';
 import { MultiFrameChart } from './components/MultiFrameChart';
 import { Settings } from './components/Settings';
+import { WelcomeScreen } from './components/WelcomeScreen';
 import { CompassData, SerialPort, DebugPoint, Language, ThemeMode } from './types';
 import { Usb, PlugZap, Activity, BarChart2, Layers, Crosshair, CheckCircle2, ChevronRight, Timer, AlertCircle, Eye, Zap, Waves, Signal, Scale, Compass as CompassIcon, Navigation, Settings2, Trash2, Target, Move } from 'lucide-react';
 
@@ -52,6 +53,16 @@ function App() {
   const [port, setPort] = useState<SerialPort | null>(null);
   const [connected, setConnected] = useState(false);
   const [isConnecting, setIsConnecting] = useState(false);
+  const [connectionError, setConnectionError] = useState<string | null>(null);
+  const [skipWelcome, setSkipWelcome] = usePersistentState('cfg_skipWelcome', false);
+
+  // Auto-dismiss connection errors after 6 seconds
+  useEffect(() => {
+    if (connectionError) {
+      const timer = setTimeout(() => setConnectionError(null), 6000);
+      return () => clearTimeout(timer);
+    }
+  }, [connectionError]);
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
 
@@ -413,6 +424,7 @@ function App() {
 
   const connectToPort = async () => {
     if (connected) return;
+    setConnectionError(null);
     try {
       // Clean up previous state first
       await disconnectSerial();
@@ -422,7 +434,9 @@ function App() {
         // Ignore AbortError (user cancelled) or NotFoundError
         console.log("Port selection skipped/cancelled:", err.message);
         if (!err.message?.includes('cancelled')) {
-           alert("串口选择错误 / Selection error: " + err.message);
+           setConnectionError(language === 'zh'
+             ? "串口选择错误：" + err.message
+             : "Port selection error: " + err.message);
         }
         return null;
       });
@@ -475,6 +489,7 @@ function App() {
 
   // Helper: Open and configure a port
   const setupPort = async (p: SerialPort) => {
+    setConnectionError(null);
     setIsConnecting(true);
     try {
       await p.open({ baudRate: 115200 });
@@ -484,7 +499,9 @@ function App() {
         console.log("Port was already open, attempting to reuse...");
       } else {
         console.error("Failed to open port:", err);
-        alert("串口打开失败 / Failed to open port:\n" + msg + "\n请检查该端口是否被其他程序（如串口助手）占用。");
+        setConnectionError(language === 'zh'
+          ? "串口打开失败：" + msg + "。请检查该端口是否被其他程序（如串口助手）占用。"
+          : "Failed to open port: " + msg + ". Check if another program is using this port.");
         setConnected(false);
         setPort(null);
         setIsConnecting(false);
@@ -506,7 +523,9 @@ function App() {
     dataTimeoutRef.current = setTimeout(() => {
         if (portRef.current === p && !hasValidDataRef.current) {
              setIsConnecting(false);
-             alert("可能未开机或没选对COM口");
+             setConnectionError(language === 'zh'
+               ? "未检测到有效数据流，请确认仪器电源已打开且选择了正确的COM口"
+               : "No valid data detected. Ensure device is powered on and correct COM port is selected.");
              disconnectSerial();
         }
     }, 3000);
@@ -618,6 +637,9 @@ function App() {
           <p className="mt-2 text-slate-500 dark:text-slate-400 text-sm font-mono">
               {language === 'zh' ? "请确保设备已开机并输出正确波特率" : "Ensure device is powered on and check connection"}
           </p>
+          <button onClick={disconnectSerial} className="mt-6 px-8 py-2.5 bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 text-[10px] font-black tracking-widest rounded-xl border border-slate-300 dark:border-white/10 hover:bg-slate-300 dark:hover:bg-white/10 transition-all">
+              {language === 'zh' ? '取消' : 'CANCEL'}
+          </button>
         </div>
       )}
 
@@ -754,19 +776,28 @@ function App() {
 
       <main className="flex-grow flex flex-col min-h-0 h-full p-6 relative overflow-hidden">
         {viewMode === 'COMPASS' && (
-            <div className="flex-grow flex items-center justify-center">
-                <Compass 
-                    data={compassData} 
-                    connected={connected} 
-                    threshold={threshold} 
-                    onThresholdChange={setThreshold}
-                    thresholdMin={thresholdMin}
-                    thresholdMax={thresholdMax}
-                    thresholdStep={thresholdStep}
-                    probeThreshold={probeThreshold}
+            !connected && !skipWelcome ? (
+                <WelcomeScreen
                     language={language}
+                    onConnect={connectToPort}
+                    onSkipChange={setSkipWelcome}
+                    connectionError={connectionError}
                 />
-            </div>
+            ) : (
+                <div className="flex-grow flex items-center justify-center">
+                    <Compass 
+                        data={compassData} 
+                        connected={connected} 
+                        threshold={threshold} 
+                        onThresholdChange={setThreshold}
+                        thresholdMin={thresholdMin}
+                        thresholdMax={thresholdMax}
+                        thresholdStep={thresholdStep}
+                        probeThreshold={probeThreshold}
+                        language={language}
+                    />
+                </div>
+            )
         )}
         {viewMode === 'DEBUG' && (
           <div className="flex-grow flex flex-col min-h-0 h-full">
@@ -803,6 +834,15 @@ function App() {
             </div>
         )}
       </main>
+
+      {/* Floating error banner (shown when WelcomeScreen is not visible) */}
+      {connectionError && !isConnecting && (skipWelcome || viewMode !== 'COMPASS') && (
+        <div className="fixed bottom-6 left-1/2 -translate-x-1/2 z-[100] flex items-center gap-3 px-6 py-3 bg-red-50 dark:bg-red-950/90 border border-red-200 dark:border-red-500/20 rounded-xl shadow-xl backdrop-blur-xl max-w-lg">
+          <AlertCircle className="text-red-500 flex-shrink-0" size={18} />
+          <span className="text-sm text-red-600 dark:text-red-400 flex-grow">{connectionError}</span>
+          <button onClick={() => setConnectionError(null)} className="text-red-400 hover:text-red-300 ml-2 text-lg leading-none">&times;</button>
+        </div>
+      )}
     </div>
   );
 }
