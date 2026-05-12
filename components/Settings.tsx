@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings2, Sliders, RotateCcw, Gauge, Zap, Target, ArrowLeftRight, Scale, AlertTriangle, Save, Check, Sun, Moon } from 'lucide-react';
+import { Settings2, Sliders, RotateCcw, Gauge, Zap, Target, ArrowLeftRight, Scale, AlertTriangle, Save, Check, Sun, Moon, Activity, AlertCircle } from 'lucide-react';
 import { Language, ThemeMode } from '../types';
 
 interface SettingsProps {
@@ -357,9 +357,7 @@ export const Settings: React.FC<SettingsProps> = ({
                     <p className="text-[9px] text-slate-300 dark:text-slate-800 mt-1">Enable Developer Mode to adjust core algorithms</p>
                 </div>
             )}
-        </div>
       </div>
-
       </div>
 
       {/* Floating Save Button */}

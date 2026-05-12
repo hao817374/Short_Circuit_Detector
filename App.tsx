@@ -762,7 +762,6 @@ function App() {
               </div>
           </div>
           <div className="flex items-center gap-4">
-          <div className="flex items-center gap-4">
               <nav className="bg-slate-200/50 dark:bg-slate-900/50 p-1 rounded-2xl border border-slate-300/50 dark:border-white/5 flex items-center transition-all duration-300 shadow-inner">
                   <button 
                     onClick={() => setViewMode('COMPASS')} 
@@ -804,7 +803,6 @@ function App() {
               ) : (
                   <button onClick={connectToPort} className="px-6 py-2.5 bg-cyan-600 hover:bg-cyan-500 text-white text-[10px] font-black tracking-widest rounded-xl shadow-xl flex items-center gap-2 transition-all active:scale-95"><PlugZap size={15} /> {texts.connect}</button>
               )}
-          </div>
           </div>
       </header>
 
@@ -852,7 +850,7 @@ function App() {
                                     {["SW", "NW"].map((key) => {
                                         const isCaptured = calibRefVectors[key as "SW" | "NW"] !== null;
                                         const label = key === "SW" ? t_calib.btn1 : t_calib.btn2;
-                                        const isSampling = samplingKey === key;
+                                        const isSampling = samplingStep === key;
                                         return (
                                             <button
                                                 key={key}
