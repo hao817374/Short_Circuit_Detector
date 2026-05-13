@@ -73,7 +73,6 @@ function App() {
   });
 
   const [debugData, setDebugData] = useState<DebugPoint[]>([]);
-  const [liveValues, setLiveValues] = useState<{ q0: number; q1: number }>({ q0: 0, q1: 0 });
   const tempDebugBuffer = useRef<DebugPoint[]>([]);
   
   const portRef = useRef<SerialPort | null>(null);
@@ -116,6 +115,7 @@ function App() {
   // --- Zero Calibration State (Lifted from DebugChart) ---
   const [isZeroSampling, setIsZeroSampling] = useState(false);
   const [zeroCalibStatus, setZeroCalibStatus] = useState<'IDLE' | 'SUCCESS' | 'FAILED'>('IDLE');
+  const [zeroCalibResult, setZeroCalibResult] = useState<{ q0: number; q1: number; bias: number } | null>(null);
   const zeroSamplingBuffer = useRef<{q0: number, q1: number}[]>([]);
 
   // Refs for high-speed loop access
@@ -174,8 +174,7 @@ function App() {
          const rawQ1 = baseQ1 + w2Off;
          
          currentRawValuesRef.current = { q0: rawQ0, q1: rawQ1 };
-         setLiveValues({ q0: rawQ0, q1: rawQ1 });
-
+         
          const corrQ0 = rawQ0 * matrix[0] + rawQ1 * matrix[1];
          const corrQ1 = rawQ0 * matrix[2] + rawQ1 * matrix[3];
 
@@ -215,6 +214,7 @@ function App() {
       if (isZeroSampling) return;
       setIsZeroSampling(true);
       setZeroCalibStatus('IDLE');
+      setZeroCalibResult(null);
       zeroSamplingBuffer.current = [];
 
       setTimeout(() => {
@@ -222,6 +222,7 @@ function App() {
           const samples = zeroSamplingBuffer.current;
           if (samples.length < 5) {
               setZeroCalibStatus('FAILED');
+              setZeroCalibResult(null);
               return;
           }
 
@@ -244,7 +245,7 @@ function App() {
           const rangeQ0 = maxQ0 - minQ0;
           const rangeQ1 = maxQ1 - minQ1;
 
-          // Stability Check: 
+          // Stability Check:
           // If fluctuation exceeds 1000 units (3 orders of magnitude), fail.
           // Typical ADC noise for shorted probes should be much lower (e.g. < 50)
           const STABILITY_THRESHOLD = 1000;
@@ -258,8 +259,20 @@ function App() {
               const newGlobalOffset = Math.round(globalOffset - totalAvg);
               setGlobalOffset(newGlobalOffset);
 
+              // Compute variance for BIAS
+              let varQ0 = 0, varQ1 = 0;
+              for (const s of samples) {
+                  varQ0 += (s.q0 - avgQ0) ** 2;
+                  varQ1 += (s.q1 - avgQ1) ** 2;
+              }
+              varQ0 /= samples.length;
+              varQ1 /= samples.length;
+              const bias = Math.round(Math.sqrt((varQ0 + varQ1) / 2));
+
+              setZeroCalibResult({ q0: Math.round(avgQ0), q1: Math.round(avgQ1), bias });
               setZeroCalibStatus('SUCCESS');
           } else {
+              setZeroCalibResult(null);
               setZeroCalibStatus('FAILED');
           }
           setTimeout(() => setZeroCalibStatus('IDLE'), 3000);
@@ -617,7 +630,7 @@ function App() {
     title: language === 'zh' ? "校准" : "CALIBRATION",
     subtitle: "", // Removed per request
     zeroTitle: language === 'zh' ? "零点校准" : "ZERO CALIBRATION",
-    zeroInstruction: language === 'zh' ? "将两表笔短接后，点击下方按钮" : "Short the probes, then click the button below",
+    zeroInstruction: language === 'zh' ? "将表笔短接后，点击下方按钮" : "Short the probes, then click the button below",
     dirTitle: language === 'zh' ? "方向校准" : "DIRECTION CALIBRATION",
     btn1: language === 'zh' ? "请将表笔点在右下角激励源" : "Probe on Bottom-Right Source",
     btn2: language === 'zh' ? "请将表笔点在右上角激励源" : "Probe on Top-Right Source",
@@ -840,14 +853,20 @@ function App() {
                                         {isZeroSampling ? <Timer className="animate-spin" size={16} /> : <Target size={16} />}
                                         {isZeroSampling ? t_calib.sampling : t_calib.zeroTitle}
                                     </button>
-                                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[170px] justify-center">
-                                        <span className="text-slate-400 dark:text-slate-500">Q0</span>
-                                        <span className="text-cyan-600 dark:text-cyan-400 font-bold w-14 text-right tabular-nums">{liveValues.q0}</span>
-                                        <span className="text-slate-400 dark:text-slate-500">Q1</span>
-                                        <span className="text-cyan-600 dark:text-cyan-400 font-bold w-14 text-right tabular-nums">{liveValues.q1}</span>
-                                    </div>
+                                    {zeroCalibResult !== null ? (
+                                        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[260px] justify-center">
+                                            <span className="text-slate-400 dark:text-slate-500">Q0</span>
+                                            <span className="text-cyan-600 dark:text-cyan-400 font-bold w-14 text-right tabular-nums">{zeroCalibResult.q0}</span>
+                                            <span className="text-slate-400 dark:text-slate-500">Q1</span>
+                                            <span className="text-cyan-600 dark:text-cyan-400 font-bold w-14 text-right tabular-nums">{zeroCalibResult.q1}</span>
+                                            <span className="text-slate-400 dark:text-slate-500 ml-1">BIAS</span>
+                                            <span className="text-amber-600 dark:text-amber-400 font-bold w-10 text-right tabular-nums">{zeroCalibResult.bias}</span>
+                                        </div>
+                                    ) : (
+                                        <div className="flex-1" />
+                                    )}
                                 </div>
-                                {zeroCalibStatus && <p className="mt-3 text-[10px] font-bold text-center text-emerald-500 uppercase tracking-widest">{zeroCalibStatus}</p>}
+                                {zeroCalibStatus !== 'IDLE' && zeroCalibStatus && <p className={`mt-3 text-[10px] font-bold text-center uppercase tracking-widest ${zeroCalibStatus === 'SUCCESS' ? 'text-emerald-500' : 'text-red-500'}`}>{zeroCalibStatus}</p>}
                             </div>
 
                             {/* Direction Calib Card */}
@@ -856,41 +875,36 @@ function App() {
                                     <Navigation size={16} className="text-cyan-500" />
                                     {t_calib.dirTitle}
                                 </h3>
-                                <div className="grid grid-cols-1 gap-4">
+                                <div className="flex flex-col gap-4">
                                     {["SW", "NW"].map((key) => {
                                         const isCaptured = calibRefVectors[key as "SW" | "NW"] !== null;
                                         const label = key === "SW" ? t_calib.btn1 : t_calib.btn2;
                                         const isSampling = samplingStep === key;
+                                        const capturedVal = calibRefVectors[key as "SW" | "NW"];
                                         return (
-                                            <button
-                                                key={key}
-                                                disabled={!connected || isSampling}
-                                                onClick={() => startSampling(key as "SW" | "NW")}
-                                                className={`group relative overflow-hidden h-16 rounded-2xl border-2 transition-all active:scale-95 flex items-center px-6 gap-4 ${isCaptured ? 'border-cyan-500/50 bg-cyan-600/10 text-cyan-600 dark:text-cyan-400' : 'border-slate-300 dark:border-white/10 hover:border-cyan-500/30'}`}
-                                            >
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isCaptured ? 'bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
-                                                    {isCaptured ? <CheckCircle2 size={16} /> : <Crosshair size={16} />}
-                                                </div>
-                                                <span className="text-[10px] font-black uppercase tracking-widest transition-colors">{label}</span>
-                                                <div className="ml-auto flex items-center gap-2 font-mono text-xs">
-                                                    {isCaptured ? (
-                                                        <>
-                                                            <span className="text-cyan-500 dark:text-cyan-400">Q0</span>
-                                                            <span className="text-cyan-600 dark:text-cyan-300 font-bold w-12 text-right tabular-nums">{Math.round(calibRefVectors[key]!.q0)}</span>
-                                                            <span className="text-cyan-500 dark:text-cyan-400">Q1</span>
-                                                            <span className="text-cyan-600 dark:text-cyan-300 font-bold w-12 text-right tabular-nums">{Math.round(calibRefVectors[key]!.q1)}</span>
-                                                        </>
-                                                    ) : (
-                                                        <>
-                                                            <span className="text-slate-400 dark:text-slate-600">Q0</span>
-                                                            <span className="text-slate-600 dark:text-slate-400 font-bold w-12 text-right tabular-nums">{liveValues.q0}</span>
-                                                            <span className="text-slate-400 dark:text-slate-600">Q1</span>
-                                                            <span className="text-slate-600 dark:text-slate-400 font-bold w-12 text-right tabular-nums">{liveValues.q1}</span>
-                                                        </>
-                                                    )}
-                                                </div>
-                                                {isSampling && <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 transition-all duration-200" style={{ width: `${sampleProgress}%` }}></div>}
-                                            </button>
+                                            <div key={key} className="flex items-center gap-4">
+                                                <button
+                                                    disabled={!connected || isSampling}
+                                                    onClick={() => startSampling(key as "SW" | "NW")}
+                                                    className={`group relative overflow-hidden h-16 rounded-2xl border-2 transition-all active:scale-95 flex items-center px-6 gap-4 flex-1 ${isCaptured ? 'border-cyan-500/50 bg-cyan-600/10 text-cyan-600 dark:text-cyan-400' : 'border-slate-300 dark:border-white/10 hover:border-cyan-500/30'}`}
+                                                >
+                                                    <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isCaptured ? 'bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
+                                                        {isCaptured ? <CheckCircle2 size={16} /> : <Crosshair size={16} />}
+                                                    </div>
+                                                    <span className="text-[10px] font-black uppercase tracking-widest transition-colors">{label}</span>
+                                                    {isSampling && <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 transition-all duration-200" style={{ width: `${sampleProgress}%` }} />}
+                                                </button>
+                                                {isCaptured && capturedVal ? (
+                                                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[170px] justify-center">
+                                                        <span className="text-cyan-500 dark:text-cyan-400">Q0</span>
+                                                        <span className="text-cyan-600 dark:text-cyan-300 font-bold w-12 text-right tabular-nums">{Math.round(capturedVal.q0)}</span>
+                                                        <span className="text-cyan-500 dark:text-cyan-400">Q1</span>
+                                                        <span className="text-cyan-600 dark:text-cyan-300 font-bold w-12 text-right tabular-nums">{Math.round(capturedVal.q1)}</span>
+                                                    </div>
+                                                ) : (
+                                                    <div className="min-w-[170px]" />
+                                                )}
+                                            </div>
                                         );
                                     })}
                                 </div>
@@ -917,7 +931,7 @@ function App() {
                                     </div>
                                     <svg className="w-full h-full overflow-visible" viewBox="0 0 103 100" preserveAspectRatio="none">
                                         <line x1="0" y1="50" x2="103" y2="50" stroke="currentColor" className="text-slate-300 dark:text-white/10 transition-colors" strokeWidth="0.5" />
-                                        <polyline fill="none" stroke="#22d3ee" strokeWidth="2.5" strokeLinecap="round" strokeLinejoin="round" points={debugData.map((p, i) => `${i},${100 - ((p.value + globalOffset - previewBounds.min) / previewBounds.range) * 100}`).join(' ')} className="drop-shadow-[0_0_15px_rgba(34,211,238,0.4)]" />
+                                        <polyline fill="none" stroke="#22d3ee" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={debugData.map((p, i) => `${i},${100 - ((p.value + globalOffset - previewBounds.min) / previewBounds.range) * 100}`).join(' ')} className="drop-shadow-sm dark:drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]" />
                                     </svg>
                                 </div>
                              )}
