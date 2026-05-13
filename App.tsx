@@ -73,6 +73,7 @@ function App() {
   });
 
   const [debugData, setDebugData] = useState<DebugPoint[]>([]);
+  const [liveValues, setLiveValues] = useState<{ q0: number; q1: number }>({ q0: 0, q1: 0 });
   const tempDebugBuffer = useRef<DebugPoint[]>([]);
   
   const portRef = useRef<SerialPort | null>(null);
@@ -173,6 +174,7 @@ function App() {
          const rawQ1 = baseQ1 + w2Off;
          
          currentRawValuesRef.current = { q0: rawQ0, q1: rawQ1 };
+         setLiveValues({ q0: rawQ0, q1: rawQ1 });
 
          const corrQ0 = rawQ0 * matrix[0] + rawQ1 * matrix[1];
          const corrQ1 = rawQ0 * matrix[2] + rawQ1 * matrix[3];
@@ -829,14 +831,22 @@ function App() {
                                 <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed font-medium">
                                     {t_calib.zeroInstruction}
                                 </p>
-                                <button 
-                                    onClick={handleZeroCalibrate}
-                                    disabled={isZeroSampling}
-                                    className={`w-full py-4 rounded-2xl font-black tracking-widest uppercase text-xs transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${isZeroSampling ? 'bg-slate-300 dark:bg-slate-800 text-slate-500' : 'bg-amber-500 hover:bg-amber-400 text-white'}`}
-                                >
-                                    {isZeroSampling ? <Timer className="animate-spin" size={16} /> : <Target size={16} />}
-                                    {isZeroSampling ? t_calib.sampling : t_calib.zeroTitle}
-                                </button>
+                                <div className="flex items-center gap-4">
+                                    <button
+                                        onClick={handleZeroCalibrate}
+                                        disabled={isZeroSampling}
+                                        className={`flex-1 py-4 rounded-2xl font-black tracking-widest uppercase text-xs transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${isZeroSampling ? 'bg-slate-300 dark:bg-slate-800 text-slate-500' : 'bg-amber-500 hover:bg-amber-400 text-white'}`}
+                                    >
+                                        {isZeroSampling ? <Timer className="animate-spin" size={16} /> : <Target size={16} />}
+                                        {isZeroSampling ? t_calib.sampling : t_calib.zeroTitle}
+                                    </button>
+                                    <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[170px] justify-center">
+                                        <span className="text-slate-400 dark:text-slate-500">Q0</span>
+                                        <span className="text-cyan-600 dark:text-cyan-400 font-bold w-14 text-right tabular-nums">{liveValues.q0}</span>
+                                        <span className="text-slate-400 dark:text-slate-500">Q1</span>
+                                        <span className="text-cyan-600 dark:text-cyan-400 font-bold w-14 text-right tabular-nums">{liveValues.q1}</span>
+                                    </div>
+                                </div>
                                 {zeroCalibStatus && <p className="mt-3 text-[10px] font-bold text-center text-emerald-500 uppercase tracking-widest">{zeroCalibStatus}</p>}
                             </div>
 
@@ -858,10 +868,27 @@ function App() {
                                                 onClick={() => startSampling(key as "SW" | "NW")}
                                                 className={`group relative overflow-hidden h-16 rounded-2xl border-2 transition-all active:scale-95 flex items-center px-6 gap-4 ${isCaptured ? 'border-cyan-500/50 bg-cyan-600/10 text-cyan-600 dark:text-cyan-400' : 'border-slate-300 dark:border-white/10 hover:border-cyan-500/30'}`}
                                             >
-                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center ${isCaptured ? 'bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
+                                                <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isCaptured ? 'bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
                                                     {isCaptured ? <CheckCircle2 size={16} /> : <Crosshair size={16} />}
                                                 </div>
                                                 <span className="text-[10px] font-black uppercase tracking-widest transition-colors">{label}</span>
+                                                <div className="ml-auto flex items-center gap-2 font-mono text-xs">
+                                                    {isCaptured ? (
+                                                        <>
+                                                            <span className="text-cyan-500 dark:text-cyan-400">Q0</span>
+                                                            <span className="text-cyan-600 dark:text-cyan-300 font-bold w-12 text-right tabular-nums">{Math.round(calibRefVectors[key]!.q0)}</span>
+                                                            <span className="text-cyan-500 dark:text-cyan-400">Q1</span>
+                                                            <span className="text-cyan-600 dark:text-cyan-300 font-bold w-12 text-right tabular-nums">{Math.round(calibRefVectors[key]!.q1)}</span>
+                                                        </>
+                                                    ) : (
+                                                        <>
+                                                            <span className="text-slate-400 dark:text-slate-600">Q0</span>
+                                                            <span className="text-slate-600 dark:text-slate-400 font-bold w-12 text-right tabular-nums">{liveValues.q0}</span>
+                                                            <span className="text-slate-400 dark:text-slate-600">Q1</span>
+                                                            <span className="text-slate-600 dark:text-slate-400 font-bold w-12 text-right tabular-nums">{liveValues.q1}</span>
+                                                        </>
+                                                    )}
+                                                </div>
                                                 {isSampling && <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 transition-all duration-200" style={{ width: `${sampleProgress}%` }}></div>}
                                             </button>
                                         );
