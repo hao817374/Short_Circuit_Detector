@@ -136,12 +136,18 @@ const VerticalSlider: React.FC<VerticalSliderProps> = ({ value, onChange, min, m
     );
 };
 
-export const Compass: React.FC<CompassProps> = ({ 
-    data, connected, 
+/**
+ * 罗盘 HUD 组件 — 4 种模式：离线 / 表笔断开 / 短路附近 / 导航中
+ * data.heading 为地理惯例角度（0°=北/正上，90°=东/正右），由 App.tsx 中 DEFAULT_MAP 转换而来
+ * visualHeading 通过最短旋转路径插值实现平滑指针旋转
+ */
+export const Compass: React.FC<CompassProps> = ({
+    data, connected,
     threshold, onThresholdChange,
     thresholdMin, thresholdMax, thresholdStep,
     probeThreshold, language
 }) => {
+  // 最短旋转路径插值：避免指针从 359° 直接跳到 1° 时逆时针大转
   const [visualHeading, setVisualHeading] = useState(0);
 
   useEffect(() => {
@@ -168,17 +174,17 @@ export const Compass: React.FC<CompassProps> = ({
   else if (isNearby) mode = 'nearby';
   else mode = 'navigating';
 
+  // 地理方位文字映射：heading 为地理惯例（0°=北/上，顺时针增加）
   const getMoveInstruction = () => {
     let dirText = "";
     const h = data.heading;
-    
-    // Translation Map
+
     const dirs: Record<number, string> = language === 'zh' ? {
-        0: "正上方", 315: "左上方", 270: "正左方", 225: "左下方",
-        180: "正下方", 135: "右下方", 90: "正右方", 45: "右上方"
+        0: "正上方", 45: "右上方", 90: "正右方", 135: "右下方",
+        180: "正下方", 225: "左下方", 270: "正左方", 315: "左上方"
     } : {
-        0: "NORTH", 315: "NORTH WEST", 270: "WEST", 225: "SOUTH WEST",
-        180: "SOUTH", 135: "SOUTH EAST", 90: "EAST", 45: "NORTH EAST"
+        0: "NORTH", 45: "NORTH EAST", 90: "EAST", 135: "SOUTH EAST",
+        180: "SOUTH", 225: "SOUTH WEST", 270: "WEST", 315: "NORTH WEST"
     };
 
     dirText = dirs[h] || (language === 'zh' ? "正在解析..." : "CALCULATING...");

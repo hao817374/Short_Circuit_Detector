@@ -14,15 +14,21 @@ import { getWindowAvg, WINDOW_SIZE, WINDOW_CENTER_OFFSET } from './utils/dsp';
 
 const POINTS_PER_FRAME = 103;
 
+/**
+ * 坐标系转换查找表：数学惯例 → 地理惯例
+ * atan2(corrQ1, corrQ0) 遵循数学惯例（0°=右/东，90°=上/北）
+ * 罗盘 UI 需要地理惯例（0°=上/北，90°=右/东）
+ * 转换公式：heading = (90 - ref + 360) % 360
+ */
 const DEFAULT_MAP = [
-    { ref: 0, heading: 0 },      
-    { ref: 45, heading: 315 },   
-    { ref: 90, heading: 270 },   
-    { ref: 135, heading: 225 },  
-    { ref: 180, heading: 180 },  
-    { ref: 225, heading: 135 },  
-    { ref: 270, heading: 90 },   
-    { ref: 315, heading: 45 },   
+    { ref: 0, heading: 90 },      // 数学右(E)→地理东
+    { ref: 45, heading: 45 },     // 数学右上(NE)→地理东北
+    { ref: 90, heading: 0 },      // 数学上(N)→地理北
+    { ref: 135, heading: 315 },   // 数学左上(NW)→地理西北
+    { ref: 180, heading: 270 },   // 数学左(W)→地理西
+    { ref: 225, heading: 225 },   // 数学左下(SW)→地理西南
+    { ref: 270, heading: 180 },   // 数学下(S)→地理南
+    { ref: 315, heading: 135 },   // 数学右下(SE)→地理东南
 ];
 
 // Helper hook for localStorage persistence
@@ -154,36 +160,43 @@ function App() {
 
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
 
+  // 帧提交：串口数据管线核心，每 103 点触发一次
   const commitFrame = () => {
      if (tempDebugBuffer.current.length >= POINTS_PER_FRAME) {
          const newFrame = tempDebugBuffer.current.slice(0, POINTS_PER_FRAME);
+         // 从 ref 读取实时参数（避免闭包捕获过期的 state）
          const { w1Idx, w2Idx, gOff, w1Off, w2Off, matrix, probeT, isZeroSampling: zeroSampling } = stateRef.current;
-         
+
+         // 阶段1：DSP 降噪 — 对 Q0/Q1 各自窗口执行修剪均值
          const baseQ0 = getWindowAvg(newFrame, w1Idx, gOff);
          const baseQ1 = getWindowAvg(newFrame, w2Idx, gOff);
-         
-         // Zero Calibration Buffer Collection
+
+         // 阶段2：零点校准采样 — 采集 DSP 裸值（不含各通道独立偏移）
          if (zeroSampling) {
              zeroSamplingBuffer.current.push({ q0: baseQ0, q1: baseQ1 });
          }
 
-         // Logic: Check if probe is disconnected based on dynamic threshold (Both must be below threshold)
+         // 阶段3：探头断开检测 — 两通道均低于阈值判定为表笔悬空
          const isProbeDisconnected = baseQ0 < probeT && baseQ1 < probeT;
 
+         // 阶段4：施加各通道独立偏移补偿，得到 raw 值
          const rawQ0 = baseQ0 + w1Off;
          const rawQ1 = baseQ1 + w2Off;
-         
+
          currentRawValuesRef.current = { q0: rawQ0, q1: rawQ1 };
-         
+
+         // 阶段5：仿射变换校正 — 将失真矢量映射回正交坐标系
          const corrQ0 = rawQ0 * matrix[0] + rawQ1 * matrix[1];
          const corrQ1 = rawQ0 * matrix[2] + rawQ1 * matrix[3];
 
          const rawAngle = Math.atan2(corrQ1, corrQ0) * 180 / Math.PI;
 
+         // 方向校准采样 — 采集带偏移补偿的 raw 值
          if (samplingStep !== null) {
              samplingBuffer.current.push({ q0: rawQ0, q1: rawQ1 });
          }
 
+         // 阶段6：方位解码 — 取窗口中心点的 flag 位合成方位码
          const c1 = (w1Idx + WINDOW_CENTER_OFFSET) % newFrame.length;
          const c2 = (w2Idx + WINDOW_CENTER_OFFSET) % newFrame.length;
          const p1 = newFrame[c1];
@@ -192,12 +205,12 @@ function App() {
          if (p1 && p2) {
              const code = `${p1.flag1}${p1.flag2}${p2.flag1}${p2.flag2}`;
              const mag = Math.floor(Math.sqrt(corrQ0*corrQ0 + corrQ1*corrQ1));
-             
+
              setCompassData({
                  q0: Math.round(corrQ0), q1: Math.round(corrQ1),
                  rawQ0: Math.round(rawQ0), rawQ1: Math.round(rawQ1),
                  q0Bit: p1.flag1, q1Bit: p2.flag1,
-                 heading: getNearestHeading(rawAngle, DEFAULT_MAP), magnitude: mag, rawCode: code, 
+                 heading: getNearestHeading(rawAngle, DEFAULT_MAP), magnitude: mag, rawCode: code,
                  status: isProbeDisconnected ? "Disconnected" : "Active",
                  balanceFactor: balanceFactor, axisToCompensate: 'NONE'
              });
@@ -210,6 +223,10 @@ function App() {
      tempDebugBuffer.current = [];
   };
 
+  /**
+   * 零点校准：消除 PCB 静态偏置，使短路信号从零基线计算
+   * 流程：采集 1 秒底噪（baseQ0/baseQ1）→ 稳定性检验（range<1000）→ 归零 globalOffset → 计算方差 BIAS
+   */
   const handleZeroCalibrate = () => {
       if (isZeroSampling) return;
       setIsZeroSampling(true);
@@ -294,6 +311,7 @@ function App() {
     return bestHeading;
   };
 
+  // 方向校准采样：在指定 PCB 角（NW/SW）采集 1 秒 raw 值并取平均
   const startSampling = (step: string) => {
       if (samplingStep !== null || !connected) return;
       setSamplingStep(step);
@@ -319,21 +337,31 @@ function App() {
       }, 30);
   };
 
+  /**
+   * 2点方向校准：仿射变换矩阵求解
+   * 将 NW/SW 两点采样值映射到正交坐标系，补偿硬件 Q0/Q1 通道灵敏度差异和串扰
+   * 输出 2×2 矩阵 [m00 m01; m10 m11] 在 commitFrame 中施加：corr = matrix × raw
+   * 缩放因子 a = s/√2 动态适配信号幅度，避免固定目标矢量导致饱和或精度损失
+   */
   const finishCalibration = () => {
       const vNW = calibRefVectors["NW"];
       const vSW = calibRefVectors["SW"];
       if (!vNW || !vSW) return;
       const x1 = vNW.q0, y1 = vNW.q1, x2 = vSW.q0, y2 = vSW.q1;
+      // 行列式为零意味着两矢量共线，无法构建二维坐标系，拒绝计算
       const det = x1 * y2 - x2 * y1;
       if (Math.abs(det) < 0.001) return;
+      // 计算两采样矢量的幅度和平均
       const mag1 = Math.sqrt(x1*x1 + y1*y1), mag2 = Math.sqrt(x2*x2 + y2*y2);
       const s = (mag1 + mag2) / 2;
-      const a = s * Math.SQRT1_2; 
+      const a = s * Math.SQRT1_2;  // 输出幅度 = 输入平均幅度的 1/√2
+      // 矩阵元素：两路采样值经行列式和缩放因子组合
       const m00 = (a / det) * (y1 + y2);
       const m01 = -(a / det) * (x1 + x2);
       const m10 = (a / det) * (y2 - y1);
       const m11 = (a / det) * (x1 - x2);
       setCalibMatrix([m00, m01, m10, m11]);
+      // 灵敏度比值 K：用于 UI 显示弱轴补偿信息
       setBalanceFactor(Number((Math.max(mag1, mag2) / Math.min(mag1, mag2)).toFixed(4)));
       setCompAxis(mag1 < mag2 ? 'Q0' : 'Q1');
       setIsCalibrating2P(false);
@@ -362,6 +390,10 @@ function App() {
   const hasValidDataRef = useRef(false);
   const dataTimeoutRef = useRef<any>(null);
 
+  /**
+   * 串口读取主循环：TextDecoderStream 解码 → 按行拆分 → 4 字段解析 → 帧提交
+   * 硬件每行输出 "index value flag1 flag2"，每 103 行以 "next" 标记帧结束
+   */
   const readLoop = async (currentPort: SerialPort) => {
     let reader;
     let streamPromise;
@@ -394,20 +426,23 @@ function App() {
           for (const line of lines) {
             const trimmedLine = line.trim();
             if (!trimmedLine) continue;
-            
+
+            // "next" 是硬件帧结束标记，触发帧提交
             if (trimmedLine.includes("next")) {
                 commitFrame();
                 continue;
             }
 
+            // 按空格拆分：index value flag1 flag2（4 个整数字段）
             const parts = trimmedLine.split(/\s+/);
             if (parts.length === 4) {
-                const p1 = parseInt(parts[0], 10);
-                const p2 = parseInt(parts[1], 10);
-                const p3 = parseInt(parts[2], 10);
-                const p4 = parseInt(parts[3], 10);
-                
+                const p1 = parseInt(parts[0], 10);  // index：数据点序号（0-102）
+                const p2 = parseInt(parts[1], 10);  // value：ADC 采样值
+                const p3 = parseInt(parts[2], 10);  // flag1：Q0 通道极性/方位位
+                const p4 = parseInt(parts[3], 10);  // flag2：Q1 通道极性/方位位
+
                 if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3) && !isNaN(p4)) {
+                    // 首帧有效数据到达时解除 isConnecting 遮罩
                     if (!hasValidDataRef.current) {
                         hasValidDataRef.current = true;
                         setIsConnecting(false);
@@ -503,7 +538,10 @@ function App() {
     }
   };
 
-  // Helper: Open and configure a port
+  /**
+   * 串口配置与启动：打开端口（115200bps）→ 启动 readLoop → 设置数据有效性超时看门狗
+   * 3 秒内未收到合法数据帧 → 判定连接失败 → 内联错误横幅 → 自动断开
+   */
   const setupPort = async (p: SerialPort) => {
     setConnectionError(null);
     setIsConnecting(true);
@@ -913,7 +951,7 @@ function App() {
 
                         <div className="mt-auto pt-10 flex gap-4 border-t border-slate-200 dark:border-white/5">
                              <button onClick={resetCalibration} className="flex-1 py-4 rounded-2xl bg-red-100 dark:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 font-black hover:bg-red-200 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><Trash2 size={14} /> {t_calib.clear}</button>
-                             <button onClick={() => setViewMode('COMPASS')} disabled={!allCalibrated && !isCleared} className={`flex-[2] py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest shadow-xl active:scale-95 ${allCalibrated || isCleared ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600'}`}>{t_calib.confirm}</button>
+                             <button onClick={() => { if (allCalibrated) finishCalibration(); setViewMode('COMPASS'); }} disabled={!allCalibrated && !isCleared} className={`flex-[2] py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest shadow-xl active:scale-95 ${allCalibrated || isCleared ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600'}`}>{t_calib.confirm}</button>
                         </div>
                     </div>
 
