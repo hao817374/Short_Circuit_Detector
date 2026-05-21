@@ -921,13 +921,13 @@ function App() {
                         {isZeroSampling ? t_calib.sampling : t_calib.zeroTitle}
                       </button>
                       {zeroCalibResult !== null ? (
-                        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-sm min-w-[260px] justify-center">
-                          <span className="text-slate-400 dark:text-slate-500">Q0</span>
-                          <span className="text-cyan-600 dark:text-cyan-400 font-bold w-14 text-right tabular-nums">{zeroCalibResult.q0}</span>
-                          <span className="text-slate-400 dark:text-slate-500">Q1</span>
-                          <span className="text-cyan-600 dark:text-cyan-400 font-bold w-14 text-right tabular-nums">{zeroCalibResult.q1}</span>
-                          <span className="text-slate-400 dark:text-slate-500 ml-1">BIAS</span>
-                          <span className="text-amber-600 dark:text-amber-400 font-bold w-10 text-right tabular-nums">{zeroCalibResult.bias}</span>
+                        <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-sm min-w-[260px] justify-center">
+                          <span className="text-slate-400 dark:text-slate-500">Q0:</span>
+                          <span className="text-cyan-600 dark:text-cyan-400 font-bold tabular-nums">{zeroCalibResult.q0}</span>
+                          <span className="text-slate-400 dark:text-slate-500 ml-2">Q1:</span>
+                          <span className="text-cyan-600 dark:text-cyan-400 font-bold tabular-nums">{zeroCalibResult.q1}</span>
+                          <span className="text-slate-400 dark:text-slate-500 ml-2">BIAS:</span>
+                          <span className="text-amber-600 dark:text-amber-400 font-bold tabular-nums">{zeroCalibResult.bias}</span>
                         </div>
                       ) : (
                         <div className="flex-1" />
@@ -953,7 +953,7 @@ function App() {
                             <button
                               disabled={!connected || isSampling}
                               onClick={() => startSampling(key as "SW" | "NW")}
-                              className={`group relative overflow-hidden h-16 rounded-2xl border-2 transition-all active:scale-95 flex items-center px-6 gap-4 flex-1 ${isCaptured ? 'border-cyan-500/50 bg-cyan-600/10 text-cyan-600 dark:text-cyan-400' : 'border-slate-300 dark:border-white/10 hover:border-cyan-500/30'}`}
+                              className={`group relative overflow-hidden h-16 rounded-2xl border-2 transition-all active:scale-95 flex items-center px-6 gap-4 flex-1 max-w-[360px] ${isCaptured ? 'border-cyan-500/50 bg-cyan-600/10 text-cyan-600 dark:text-cyan-400' : 'border-slate-300 dark:border-white/10 hover:border-cyan-500/30'}`}
                             >
                               <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isCaptured ? 'bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
                                 {isCaptured ? <CheckCircle2 size={16} /> : <Crosshair size={16} />}
@@ -962,11 +962,11 @@ function App() {
                               {isSampling && <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 transition-all duration-200" style={{ width: `${sampleProgress}%` }} />}
                             </button>
                             {isCaptured && capturedVal && (
-                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-sm justify-center">
-                                <span className="text-cyan-500 dark:text-cyan-400">Q0</span>
-                                <span className="text-cyan-600 dark:text-cyan-300 font-bold w-14 text-right tabular-nums">{Math.round(capturedVal.q0)}</span>
-                                <span className="text-cyan-500 dark:text-cyan-400">Q1</span>
-                                <span className="text-cyan-600 dark:text-cyan-300 font-bold w-14 text-right tabular-nums">{Math.round(capturedVal.q1)}</span>
+                              <div className="flex items-center gap-2 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-sm justify-center">
+                                <span className="text-cyan-500 dark:text-cyan-400">Q0:</span>
+                                <span className="text-cyan-600 dark:text-cyan-300 font-bold tabular-nums">{Math.round(capturedVal.q0)}</span>
+                                <span className="text-cyan-500 dark:text-cyan-400 ml-2">Q1:</span>
+                                <span className="text-cyan-600 dark:text-cyan-300 font-bold tabular-nums">{Math.round(capturedVal.q1)}</span>
                               </div>
                             )}
                           </div>
