@@ -260,7 +260,7 @@ export const Compass: React.FC<CompassProps> = ({
         flex flex-col items-center
         transition-all duration-300 ease-in-out
         py-12 px-8
-        min-h-[70vh]
+        min-h-0
         overflow-hidden
       ">
         

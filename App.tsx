@@ -698,8 +698,8 @@ function App() {
     zeroTitle: language === 'zh' ? "零点校准" : "ZERO CALIBRATION",
     zeroInstruction: language === 'zh' ? "将表笔短接后，点击下方按钮" : "Short the probes, then click the button below",
     dirTitle: language === 'zh' ? "方向校准" : "DIRECTION CALIBRATION",
-    btn1: language === 'zh' ? "请将表笔点在右下角激励源" : "Probe on Bottom-Right Source",
-    btn2: language === 'zh' ? "请将表笔点在右上角激励源" : "Probe on Top-Right Source",
+    btn1: language === 'zh' ? "右下角激励源" : "Bottom-Right",
+    btn2: language === 'zh' ? "右上角激励源" : "Top-Right",
     sampling: language === 'zh' ? "采样中..." : "Sampling...",
     captured: language === 'zh' ? "已捕获" : "Vector Captured",
     resolved: language === 'zh' ? "校准矩阵" : "Resolved Matrix",
@@ -888,12 +888,12 @@ function App() {
         </div>
       </header>
 
-      <main className="flex-grow flex flex-col min-h-0 h-full p-6 relative overflow-hidden">
+      <main className="flex-grow flex flex-col min-h-0 h-full p-4 lg:p-6 relative overflow-hidden">
         {viewMode === 'CALIBRATION' && (
-          <div className="flex-grow flex flex-col min-h-0 h-full p-4">
-            <div className="flex-grow flex gap-6 min-h-0 h-full">
-              <div className="flex-[2] bg-white dark:bg-slate-900/60 rounded-[2.5rem] border border-slate-300 dark:border-white/5 p-10 flex flex-col transition-colors shadow-2xl relative overflow-hidden">
-                <div className="mb-10">
+          <div className="flex-grow flex flex-col min-h-0 h-full p-2 lg:p-4">
+            <div className="flex-grow flex gap-4 lg:gap-6 min-h-0 h-full">
+              <div className="flex-1 bg-white dark:bg-slate-900/60 rounded-[2.5rem] border border-slate-300 dark:border-white/5 p-6 lg:p-8 flex flex-col transition-colors shadow-2xl relative overflow-hidden">
+                <div className="mb-6">
                   <h2 className="text-3xl font-black text-slate-800 dark:text-white uppercase tracking-tighter flex items-center gap-4">
                     <Scale className="text-cyan-500" size={32} />
                     {t_calib.title}
@@ -901,9 +901,9 @@ function App() {
                   <p className="text-xs text-slate-500 dark:text-slate-500 font-mono tracking-widest uppercase mt-2">Surface Vector Mapping & Normalization</p>
                 </div>
 
-                <div className="flex-grow flex flex-col gap-8">
+                <div className="flex-grow flex flex-col gap-6">
                   {/* Zero Calib Card */}
-                  <div className="bg-slate-50 dark:bg-black/20 rounded-3xl p-8 border border-slate-200 dark:border-white/5 transition-all">
+                  <div className="bg-slate-50 dark:bg-black/20 rounded-3xl p-6 border border-slate-200 dark:border-white/5 transition-all">
                     <h3 className="text-base font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-3">
                       <Zap size={18} className="text-amber-500" />
                       {t_calib.zeroTitle}
@@ -937,12 +937,12 @@ function App() {
                   </div>
 
                   {/* Direction Calib Card */}
-                  <div className="bg-slate-50 dark:bg-black/20 rounded-3xl p-8 border border-slate-200 dark:border-white/5 transition-all">
+                  <div className="bg-slate-50 dark:bg-black/20 rounded-3xl p-6 border border-slate-200 dark:border-white/5 transition-all">
                     <h3 className="text-base font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-3">
                       <Navigation size={18} className="text-cyan-500" />
                       {t_calib.dirTitle}
                     </h3>
-                    <div className="flex flex-col gap-4">
+                    <div className="flex flex-col gap-3">
                       {["NW", "SW"].map((key) => {
                         const isCaptured = calibRefVectors[key as "SW" | "NW"] !== null;
                         const label = key === "NW" ? t_calib.btn2 : t_calib.btn1;
@@ -961,15 +961,13 @@ function App() {
                               <span className="text-xs font-black uppercase tracking-widest transition-colors">{label}</span>
                               {isSampling && <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 transition-all duration-200" style={{ width: `${sampleProgress}%` }} />}
                             </button>
-                            {isCaptured && capturedVal ? (
-                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-sm min-w-[170px] justify-center">
+                            {isCaptured && capturedVal && (
+                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-sm justify-center">
                                 <span className="text-cyan-500 dark:text-cyan-400">Q0</span>
-                                <span className="text-cyan-600 dark:text-cyan-300 font-bold w-12 text-right tabular-nums">{Math.round(capturedVal.q0)}</span>
+                                <span className="text-cyan-600 dark:text-cyan-300 font-bold w-14 text-right tabular-nums">{Math.round(capturedVal.q0)}</span>
                                 <span className="text-cyan-500 dark:text-cyan-400">Q1</span>
-                                <span className="text-cyan-600 dark:text-cyan-300 font-bold w-12 text-right tabular-nums">{Math.round(capturedVal.q1)}</span>
+                                <span className="text-cyan-600 dark:text-cyan-300 font-bold w-14 text-right tabular-nums">{Math.round(capturedVal.q1)}</span>
                               </div>
-                            ) : (
-                              <div className="min-w-[170px]" />
                             )}
                           </div>
                         );
@@ -978,7 +976,7 @@ function App() {
                   </div>
                 </div>
 
-                <div className="mt-auto pt-10 flex gap-4 border-t border-slate-200 dark:border-white/5">
+                <div className="mt-auto pt-6 flex gap-4 border-t border-slate-200 dark:border-white/5">
                   <button onClick={resetCalibration} className="flex-1 py-4 rounded-2xl bg-red-100 dark:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 font-black hover:bg-red-200 text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><Trash2 size={16} /> {t_calib.clear}</button>
                   <button onClick={() => { if (allCalibrated) finishCalibration(); setViewMode('COMPASS'); }} disabled={!allCalibrated && !isCleared} className={`flex-[2] py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest shadow-xl active:scale-95 ${allCalibrated || isCleared ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600'}`}>{t_calib.confirm}</button>
                 </div>
