@@ -904,24 +904,24 @@ function App() {
                 <div className="flex-grow flex flex-col gap-8">
                   {/* Zero Calib Card */}
                   <div className="bg-slate-50 dark:bg-black/20 rounded-3xl p-8 border border-slate-200 dark:border-white/5 transition-all">
-                    <h3 className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-3">
-                      <Zap size={16} className="text-amber-500" />
+                    <h3 className="text-base font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-3">
+                      <Zap size={18} className="text-amber-500" />
                       {t_calib.zeroTitle}
                     </h3>
-                    <p className="text-xs text-slate-500 dark:text-slate-400 mb-6 leading-relaxed font-medium">
+                    <p className="text-sm text-slate-500 dark:text-slate-400 mb-6 leading-relaxed font-medium">
                       {t_calib.zeroInstruction}
                     </p>
                     <div className="flex items-center gap-4">
                       <button
                         onClick={handleZeroCalibrate}
                         disabled={isZeroSampling}
-                        className={`flex-1 py-4 rounded-2xl font-black tracking-widest uppercase text-xs transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${isZeroSampling ? 'bg-slate-300 dark:bg-slate-800 text-slate-500' : 'bg-amber-500 hover:bg-amber-400 text-white'}`}
+                        className={`flex-1 max-w-[240px] py-4 rounded-2xl font-black tracking-widest uppercase text-xs transition-all shadow-xl flex items-center justify-center gap-3 active:scale-95 ${isZeroSampling ? 'bg-slate-300 dark:bg-slate-800 text-slate-500' : 'bg-amber-500 hover:bg-amber-400 text-white'}`}
                       >
-                        {isZeroSampling ? <Timer className="animate-spin" size={16} /> : <Target size={16} />}
+                        {isZeroSampling ? <Timer className="animate-spin" size={18} /> : <Target size={18} />}
                         {isZeroSampling ? t_calib.sampling : t_calib.zeroTitle}
                       </button>
                       {zeroCalibResult !== null ? (
-                        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[260px] justify-center">
+                        <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-sm min-w-[260px] justify-center">
                           <span className="text-slate-400 dark:text-slate-500">Q0</span>
                           <span className="text-cyan-600 dark:text-cyan-400 font-bold w-14 text-right tabular-nums">{zeroCalibResult.q0}</span>
                           <span className="text-slate-400 dark:text-slate-500">Q1</span>
@@ -933,13 +933,13 @@ function App() {
                         <div className="flex-1" />
                       )}
                     </div>
-                    {zeroCalibStatus !== 'IDLE' && zeroCalibStatus && <p className={`mt-3 text-[10px] font-bold text-center uppercase tracking-widest ${zeroCalibStatus === 'SUCCESS' ? 'text-emerald-500' : 'text-red-500'}`}>{zeroCalibStatus}</p>}
+                    {zeroCalibStatus !== 'IDLE' && zeroCalibStatus && <p className={`mt-3 text-xs font-bold text-center uppercase tracking-widest ${zeroCalibStatus === 'SUCCESS' ? 'text-emerald-500' : 'text-red-500'}`}>{zeroCalibStatus}</p>}
                   </div>
 
                   {/* Direction Calib Card */}
                   <div className="bg-slate-50 dark:bg-black/20 rounded-3xl p-8 border border-slate-200 dark:border-white/5 transition-all">
-                    <h3 className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-3">
-                      <Navigation size={16} className="text-cyan-500" />
+                    <h3 className="text-base font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest mb-4 flex items-center gap-3">
+                      <Navigation size={18} className="text-cyan-500" />
                       {t_calib.dirTitle}
                     </h3>
                     <div className="flex flex-col gap-4">
@@ -958,11 +958,11 @@ function App() {
                               <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${isCaptured ? 'bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-500'}`}>
                                 {isCaptured ? <CheckCircle2 size={16} /> : <Crosshair size={16} />}
                               </div>
-                              <span className="text-[10px] font-black uppercase tracking-widest transition-colors">{label}</span>
+                              <span className="text-xs font-black uppercase tracking-widest transition-colors">{label}</span>
                               {isSampling && <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 transition-all duration-200" style={{ width: `${sampleProgress}%` }} />}
                             </button>
                             {isCaptured && capturedVal ? (
-                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[170px] justify-center">
+                              <div className="flex items-center gap-3 px-4 py-3 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-sm min-w-[170px] justify-center">
                                 <span className="text-cyan-500 dark:text-cyan-400">Q0</span>
                                 <span className="text-cyan-600 dark:text-cyan-300 font-bold w-12 text-right tabular-nums">{Math.round(capturedVal.q0)}</span>
                                 <span className="text-cyan-500 dark:text-cyan-400">Q1</span>
@@ -979,8 +979,8 @@ function App() {
                 </div>
 
                 <div className="mt-auto pt-10 flex gap-4 border-t border-slate-200 dark:border-white/5">
-                  <button onClick={resetCalibration} className="flex-1 py-4 rounded-2xl bg-red-100 dark:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 font-black hover:bg-red-200 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><Trash2 size={14} /> {t_calib.clear}</button>
-                  <button onClick={() => { if (allCalibrated) finishCalibration(); setViewMode('COMPASS'); }} disabled={!allCalibrated && !isCleared} className={`flex-[2] py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest shadow-xl active:scale-95 ${allCalibrated || isCleared ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600'}`}>{t_calib.confirm}</button>
+                  <button onClick={resetCalibration} className="flex-1 py-4 rounded-2xl bg-red-100 dark:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 font-black hover:bg-red-200 text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><Trash2 size={16} /> {t_calib.clear}</button>
+                  <button onClick={() => { if (allCalibrated) finishCalibration(); setViewMode('COMPASS'); }} disabled={!allCalibrated && !isCleared} className={`flex-[2] py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest shadow-xl active:scale-95 ${allCalibrated || isCleared ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600'}`}>{t_calib.confirm}</button>
                 </div>
               </div>
 
