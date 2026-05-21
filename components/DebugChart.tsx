@@ -260,7 +260,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
             </div>
             <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-800 shadow-[0_0_20px_rgba(0,0,0,0.1),inset_0_0_20px_rgba(0,0,0,0.03)] dark:shadow-[0_0_40px_rgba(0,0,0,0.6),inset_0_0_20px_rgba(255,255,255,0.03)] flex items-center justify-center overflow-hidden transition-colors duration-300">
                  <div className="absolute top-3 text-[8px] font-black text-slate-400 dark:text-slate-600 tracking-widest uppercase font-mono">ANGLE</div>
-                 <div className="absolute inset-0 flex items-center justify-center transition-transform duration-300 ease-out" style={{ transform: `rotate(${-rawAngle}deg)` }}>
+                 <div className="absolute inset-0 flex items-center justify-center transition-transform duration-300 ease-out" style={{ transform: `rotate(${90 - rawAngle}deg)` }}>
                     <div className="w-1 h-1/2 bg-amber-500 shadow-[0_0_15px_#f59e0b] origin-bottom -translate-y-1/2 opacity-80"></div>
                  </div>
                  <div className="z-10 bg-white/95 dark:bg-slate-950/95 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10 shadow-2xl backdrop-blur-md">

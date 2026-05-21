@@ -138,7 +138,8 @@ const VerticalSlider: React.FC<VerticalSliderProps> = ({ value, onChange, min, m
 
 /**
  * 罗盘 HUD 组件 — 4 种模式：离线 / 表笔断开 / 短路附近 / 导航中
- * data.heading 为地理惯例角度（0°=北/正上，90°=东/正右），由 App.tsx 中 DEFAULT_MAP 转换而来
+ * data.heading 为罗盘角度（0°=北/正上，90°=东/正右，顺时针递增）
+ * 由 App.tsx 中 DEFAULT_MAP 通过 heading=(360-ref)%360 公式从 atan2 角度转换而来
  * visualHeading 通过最短旋转路径插值实现平滑指针旋转
  */
 export const Compass: React.FC<CompassProps> = ({
