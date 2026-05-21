@@ -846,34 +846,35 @@ function App() {
           <nav className="bg-slate-200/50 dark:bg-slate-900/50 p-1 rounded-2xl border border-slate-300/50 dark:border-white/5 flex items-center transition-all duration-300 shadow-inner">
             <button
               onClick={() => setViewMode('COMPASS')}
-              className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'COMPASS' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+              className={`px-6 py-2 rounded-xl text-[11px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'COMPASS' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
             >
               <span>{texts.nav_compass}</span>
-              <span className="opacity-40 text-[8px] font-medium tracking-tight">DETECTION</span>
+              <span className="opacity-40 text-[10px] font-medium tracking-tight">DETECTION</span>
             </button>
             <button
               onClick={() => setViewMode('CALIBRATION')}
-              className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'CALIBRATION' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+              className={`px-6 py-2 rounded-xl text-[11px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'CALIBRATION' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
             >
               <span>{texts.nav_calib}</span>
-              <span className="opacity-40 text-[8px] font-medium tracking-tight">CALIBRATION</span>
+              <span className="opacity-40 text-[10px] font-medium tracking-tight">CALIBRATION</span>
             </button>
 
             {isDeveloperMode && (
               <button
                 onClick={() => setViewMode('DEBUG')}
-                className={`px-6 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'DEBUG' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+                className={`px-6 py-2 rounded-xl text-[11px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'DEBUG' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
               >
                 <span>{texts.nav_debug}</span>
-                <span className="opacity-40 text-[8px] font-medium tracking-tight">DEBUG</span>
+                <span className="opacity-40 text-[10px] font-medium tracking-tight">DEBUG</span>
               </button>
             )}
 
             <button
               onClick={() => setViewMode('SETTINGS')}
-              className={`px-4 py-2 rounded-xl text-[10px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'SETTINGS' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
+              className={`px-6 py-2 rounded-xl text-[11px] font-black tracking-widest transition-all flex flex-col items-center gap-0.5 ${viewMode === 'SETTINGS' ? 'bg-cyan-600 text-white shadow-lg scale-[1.02]' : 'text-slate-600 dark:text-slate-500 hover:text-slate-900 dark:hover:text-slate-300'}`}
             >
-              <Settings2 size={16} />
+              <span>{texts.nav_settings}</span>
+              <span className="opacity-40 text-[10px] font-medium tracking-tight">SETTINGS</span>
             </button>
           </nav>
 
