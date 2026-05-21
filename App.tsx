@@ -399,7 +399,8 @@ function App() {
     setBalanceFactor(1.0);
     setCompAxis('NONE');
     setCalibRefVectors({ "NW": null, "SW": null });
-    // Modal stays open, allowing user to click "Confirm" to exit or Recalibrate
+    setZeroCalibResult(null);
+    setZeroCalibStatus('IDLE');
   };
 
   const handleConfirmAndExit = () => {
@@ -941,9 +942,9 @@ function App() {
                       {t_calib.dirTitle}
                     </h3>
                     <div className="flex flex-col gap-4">
-                      {["SW", "NW"].map((key) => {
+                      {["NW", "SW"].map((key) => {
                         const isCaptured = calibRefVectors[key as "SW" | "NW"] !== null;
-                        const label = key === "SW" ? t_calib.btn1 : t_calib.btn2;
+                        const label = key === "NW" ? t_calib.btn2 : t_calib.btn1;
                         const isSampling = samplingStep === key;
                         const capturedVal = calibRefVectors[key as "SW" | "NW"];
                         return (
