@@ -116,7 +116,7 @@ export const Settings: React.FC<SettingsProps> = ({
     cardCalib: language === 'zh' ? "信号校准" : "Signal Calibration",
     
     // Thresholds
-    initThreshold: language === 'zh' ? "初始短路阈值" : "Initial Threshold",
+    initThreshold: language === 'zh' ? "短路阈值" : "Threshold",
     sliderMin: language === 'zh' ? "滑动条最小值" : "Slider Min",
     sliderMax: language === 'zh' ? "滑动条最大值" : "Slider Max",
     step: language === 'zh' ? "步进精度" : "Step Granularity",
@@ -192,42 +192,42 @@ export const Settings: React.FC<SettingsProps> = ({
         
         <div className="flex items-center gap-4">
             <div className="flex bg-slate-200 dark:bg-slate-900 rounded-xl p-1 border border-slate-300 dark:border-white/10">
-                <button 
-                    onClick={() => setThemeMode('light')} 
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${themeMode === 'light' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                <button
+                    onClick={() => setThemeMode('light')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black tracking-widest transition-all ${themeMode === 'light' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
                     <Sun size={14} /> {language === 'zh' ? '日间' : 'LIGHT'}
                 </button>
-                <button 
-                    onClick={() => setThemeMode('dark')} 
-                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${themeMode === 'dark' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                <button
+                    onClick={() => setThemeMode('dark')}
+                    className={`flex items-center gap-2 px-4 py-2 rounded-lg text-xs font-black tracking-widest transition-all ${themeMode === 'dark' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
                     <Moon size={14} /> {language === 'zh' ? '夜间' : 'DARK'}
                 </button>
             </div>
             <div className="flex bg-slate-200 dark:bg-slate-900 rounded-xl p-1 border border-slate-300 dark:border-white/10">
-                <button 
-                    onClick={() => setLanguage('en')} 
-                    className={`px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${language === 'en' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                <button
+                    onClick={() => setLanguage('en')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black tracking-widest transition-all ${language === 'en' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
                     EN
                 </button>
-                <button 
-                    onClick={() => setLanguage('zh')} 
-                    className={`px-4 py-2 rounded-lg text-[10px] font-black tracking-widest transition-all ${language === 'zh' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
+                <button
+                    onClick={() => setLanguage('zh')}
+                    className={`px-4 py-2 rounded-lg text-xs font-black tracking-widest transition-all ${language === 'zh' ? 'bg-white dark:bg-slate-800 text-slate-800 dark:text-white shadow-xl' : 'text-slate-500 hover:text-slate-700 dark:hover:text-slate-300'}`}
                 >
                     中文
                 </button>
             </div>
-            <button 
+            <button
                 onClick={handleResetDefaults}
-                className="flex items-center gap-2 px-5 py-3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition-all text-[10px] font-black tracking-widest border border-slate-300 dark:border-white/5"
+                className="flex items-center gap-2 px-5 py-3 bg-slate-200 hover:bg-slate-300 dark:bg-slate-800 dark:hover:bg-slate-700 text-slate-600 dark:text-slate-400 hover:text-slate-900 dark:hover:text-white rounded-xl transition-all text-xs font-black tracking-widest border border-slate-300 dark:border-white/5"
             >
                 <RotateCcw size={14} /> {t.reset}
             </button>
-            <button 
+            <button
                 onClick={() => setShowDevWarning(true)}
-                className="flex items-center gap-2 px-5 py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-500 rounded-xl transition-all text-[10px] font-black tracking-widest border border-amber-500/30 shadow-inner group"
+                className="flex items-center gap-2 px-5 py-3 bg-amber-500/10 hover:bg-amber-500/20 text-amber-600 dark:text-amber-500 rounded-xl transition-all text-xs font-black tracking-widest border border-amber-500/30 shadow-inner group"
             >
                 <Activity size={14} className="group-hover:animate-pulse" /> {t.devMode}
             </button>
@@ -242,69 +242,71 @@ export const Settings: React.FC<SettingsProps> = ({
                 <div className="p-3 bg-cyan-500/10 rounded-2xl text-cyan-500 border border-cyan-500/20"><Sliders size={24} /></div>
                 <div>
                     <h3 className="text-xl font-black text-slate-900 dark:text-white uppercase tracking-tight">{t.basicSection}</h3>
-                    <p className="text-[10px] text-slate-500 uppercase font-black tracking-widest mt-0.5">Threshold & Range Parameters</p>
+                    <p className="text-xs text-slate-500 uppercase font-black tracking-widest mt-0.5">Threshold & Range Parameters</p>
                 </div>
             </div>
 
-            <div className="grid grid-cols-1 xl:grid-cols-2 gap-10">
-                <div className="space-y-8">
-                    <div className="bg-slate-50 dark:bg-black/20 p-8 rounded-3xl border border-slate-200 dark:border-white/5">
-                        <div className="flex justify-between items-end mb-4">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-[0.2em]">{t.initThreshold}</label>
-                            <span className="text-2xl font-mono font-black text-cyan-600 dark:text-cyan-400">{localThreshold}</span>
-                        </div>
-                        <input 
-                            type="range" 
-                            min={localThresholdMin} max={localThresholdMax} step={localThresholdStep}
-                            value={localThreshold}
-                            onChange={(e) => setLocalThreshold(Number(e.target.value))}
-                            className="w-full h-2.5 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 transition-all"
-                        />
+            <div className="grid grid-cols-2 gap-6 mb-6">
+                {/* 滑动条最小值 */}
+                <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
+                    <div className="flex justify-between items-end mb-3">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{t.sliderMin}</label>
+                        <span className="text-xl font-mono font-black text-cyan-600 dark:text-cyan-400">{localThresholdMin}</span>
                     </div>
-
-                    <div className="grid grid-cols-2 gap-6">
-                        <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">{t.sliderMin}</label>
-                            <input 
-                                type="number" 
-                                value={localThresholdMin}
-                                onChange={(e) => setLocalThresholdMin(Number(e.target.value))}
-                                className="w-full bg-transparent font-mono text-2xl font-black text-slate-800 dark:text-slate-200 outline-none"
-                            />
-                        </div>
-                        <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
-                            <label className="text-[10px] font-black text-slate-400 uppercase tracking-widest mb-3 block">{t.sliderMax}</label>
-                            <input 
-                                type="number" 
-                                value={localThresholdMax}
-                                onChange={(e) => setLocalThresholdMax(Number(e.target.value))}
-                                className="w-full bg-transparent font-mono text-2xl font-black text-slate-800 dark:text-slate-200 outline-none"
-                            />
-                        </div>
-                    </div>
+                    <input
+                        type="range"
+                        min={5} max={30} value={localThresholdMin}
+                        onChange={(e) => setLocalThresholdMin(Number(e.target.value))}
+                        className="w-full h-2.5 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 transition-all"
+                    />
                 </div>
-
-                <div className="flex flex-col justify-between">
-                    <div className="p-8 bg-slate-50 dark:bg-black/20 rounded-3xl border border-slate-200 dark:border-white/5 flex items-center justify-between">
-                         <div className="max-w-[180px]">
-                            <label className="text-[10px] font-black text-slate-500 uppercase tracking-widest block">{t.step}</label>
-                            <p className="text-[9px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed font-medium">{t.stepDesc}</p>
-                         </div>
-                         <input 
-                            type="number" 
-                            value={localThresholdStep}
-                            onChange={(e) => setLocalThresholdStep(Number(e.target.value))}
-                            className="w-24 bg-white dark:bg-slate-900 border-2 border-slate-300 dark:border-white/10 rounded-2xl py-3 px-4 text-center font-mono text-xl font-black text-slate-800 dark:text-slate-200 outline-none focus:border-cyan-500/50 transition-all shadow-inner"
-                         />
+                {/* 滑动条最大值 */}
+                <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
+                    <div className="flex justify-between items-end mb-3">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{t.sliderMax}</label>
+                        <span className="text-xl font-mono font-black text-cyan-600 dark:text-cyan-400">{localThresholdMax}</span>
                     </div>
-
-                    <div className="mt-6 flex items-center gap-4 p-6 bg-amber-500/5 rounded-[2rem] border border-amber-500/10">
-                        <AlertCircle size={20} className="text-amber-500 flex-shrink-0" />
-                        <p className="text-[10px] text-amber-700/70 dark:text-amber-500/60 font-medium leading-relaxed uppercase tracking-wider">
-                            {language === 'zh' ? '基础显示设置仅影响 UI 交互，不改变仪器测量精度。' : 'Basic settings only affect UI interaction, not measurement accuracy.'}
-                        </p>
-                    </div>
+                    <input
+                        type="range"
+                        min={300} max={500} value={localThresholdMax}
+                        onChange={(e) => setLocalThresholdMax(Number(e.target.value))}
+                        className="w-full h-2.5 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 transition-all"
+                    />
                 </div>
+                {/* 短路阈值 */}
+                <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
+                    <div className="flex justify-between items-end mb-3">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{t.initThreshold}</label>
+                        <span className="text-xl font-mono font-black text-cyan-600 dark:text-cyan-400">{localThreshold}</span>
+                    </div>
+                    <input
+                        type="range"
+                        min={localThresholdMin} max={localThresholdMax} step={localThresholdStep}
+                        value={localThreshold}
+                        onChange={(e) => setLocalThreshold(Number(e.target.value))}
+                        className="w-full h-2.5 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 transition-all"
+                    />
+                </div>
+                {/* 步进精度 */}
+                <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
+                    <div className="flex justify-between items-end mb-3">
+                        <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{t.step}</label>
+                        <span className="text-xl font-mono font-black text-cyan-600 dark:text-cyan-400">{localThresholdStep}</span>
+                    </div>
+                    <input
+                        type="range"
+                        min={5} max={20} value={localThresholdStep}
+                        onChange={(e) => setLocalThresholdStep(Number(e.target.value))}
+                        className="w-full h-2.5 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 transition-all"
+                    />
+                </div>
+            </div>
+
+            <div className="flex items-center justify-center gap-4 p-6 bg-amber-500/5 rounded-[2rem] border border-amber-500/10 max-w-xl mx-auto">
+                <AlertCircle size={20} className="text-amber-500 flex-shrink-0" />
+                <p className="text-xs text-amber-700/70 dark:text-amber-500/60 font-medium leading-relaxed uppercase tracking-wider">
+                    {language === 'zh' ? '基础显示设置仅影响 UI 交互，不改变仪器测量精度。' : 'Basic settings only affect UI interaction, not measurement accuracy.'}
+                </p>
             </div>
         </div>
       </div>
