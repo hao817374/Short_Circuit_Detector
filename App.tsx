@@ -258,12 +258,12 @@ function App() {
   const handleZeroCalibrate = () => {
     if (isZeroSampling) return;
     setIsZeroSampling(true);
-    setZeroCalibEverRun(true);
     setZeroCalibStatus('IDLE');
     zeroSamplingBuffer.current = [];
 
     setTimeout(() => {
       setIsZeroSampling(false);
+      setZeroCalibEverRun(true);
       const samples = zeroSamplingBuffer.current;
       if (samples.length < 5) {
         setZeroCalibStatus('FAILED');
@@ -293,7 +293,7 @@ function App() {
       // Stability Check:
       // If fluctuation exceeds 1000 units (3 orders of magnitude), fail.
       // Typical ADC noise for shorted probes should be much lower (e.g. < 50)
-      const STABILITY_THRESHOLD = 1000;
+      const STABILITY_THRESHOLD = Math.max(1000, Math.max(Math.abs(avgQ0), Math.abs(avgQ1)) * 0.15);
 
       const isStableQ0 = rangeQ0 < STABILITY_THRESHOLD;
       const isStableQ1 = rangeQ1 < STABILITY_THRESHOLD;
@@ -351,16 +351,39 @@ function App() {
       setSampleProgress(Math.min(100, (elapsed / 1000) * 100));
       if (elapsed >= 1000) {
         clearInterval(timer);
-        let avgQ0 = 0, avgQ1 = 0;
-        if (samplingBuffer.current.length > 0) {
-          avgQ0 = samplingBuffer.current.reduce((acc, v) => acc + v.q0, 0) / samplingBuffer.current.length;
-          avgQ1 = samplingBuffer.current.reduce((acc, v) => acc + v.q1, 0) / samplingBuffer.current.length;
-        } else {
-          avgQ0 = currentRawValuesRef.current.q0;
-          avgQ1 = currentRawValuesRef.current.q1;
+        const samples = samplingBuffer.current;
+        if (samples.length < 5) {
+          setSpatialCalibStatus(prev => ({ ...prev, [step]: 'FAILED' }));
+          setTimeout(() => setSpatialCalibStatus(prev => ({ ...prev, [step]: 'IDLE' })), 3000);
+          setSamplingStep(null);
+          return;
         }
-        setCalibRefVectors(prev => ({ ...prev, [step]: { q0: avgQ0, q1: avgQ1 } }));
-        setSpatialCalibStatus(prev => ({ ...prev, [step]: 'SUCCESS' }));
+
+        let sumQ0 = 0, sumQ1 = 0;
+        let minQ0 = Infinity, maxQ0 = -Infinity;
+        let minQ1 = Infinity, maxQ1 = -Infinity;
+
+        for (const s of samples) {
+          sumQ0 += s.q0;
+          sumQ1 += s.q1;
+          if (s.q0 < minQ0) minQ0 = s.q0;
+          if (s.q0 > maxQ0) maxQ0 = s.q0;
+          if (s.q1 < minQ1) minQ1 = s.q1;
+          if (s.q1 > maxQ1) maxQ1 = s.q1;
+        }
+
+        const avgQ0 = sumQ0 / samples.length;
+        const avgQ1 = sumQ1 / samples.length;
+        const rangeQ0 = maxQ0 - minQ0;
+        const rangeQ1 = maxQ1 - minQ1;
+        const STABILITY_THRESHOLD = Math.max(1000, Math.max(Math.abs(avgQ0), Math.abs(avgQ1)) * 0.15);
+
+        if (rangeQ0 < STABILITY_THRESHOLD && rangeQ1 < STABILITY_THRESHOLD) {
+          setCalibRefVectors(prev => ({ ...prev, [step]: { q0: avgQ0, q1: avgQ1 } }));
+          setSpatialCalibStatus(prev => ({ ...prev, [step]: 'SUCCESS' }));
+        } else {
+          setSpatialCalibStatus(prev => ({ ...prev, [step]: 'FAILED' }));
+        }
         setTimeout(() => setSpatialCalibStatus(prev => ({ ...prev, [step]: 'IDLE' })), 3000);
         setSamplingStep(null);
       }
@@ -933,9 +956,12 @@ function App() {
                       <button
                         onClick={handleZeroCalibrate}
                         disabled={isZeroSampling}
-                        className={`relative overflow-hidden flex-1 max-w-[240px] h-16 rounded-2xl border-2 font-black tracking-widest uppercase text-xs transition-all flex items-center justify-center gap-3 active:scale-95 ${isZeroSampling ? 'border-amber-500/50 bg-amber-500/20 text-amber-600 dark:text-amber-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:border-amber-500/50 hover:bg-amber-500/20'}`}
+                        className={`relative overflow-hidden flex-1 max-w-[360px] h-16 rounded-2xl border-2 font-black tracking-widest uppercase text-xs transition-all flex items-center px-6 gap-4 active:scale-95 ${isZeroSampling ? 'border-amber-500/50 bg-amber-500/20 text-amber-600 dark:text-amber-400' : zeroCalibResult !== null ? 'border-amber-500/50 bg-amber-500/10 text-amber-600 dark:text-amber-400' : 'border-amber-500/30 bg-amber-500/10 text-amber-600 dark:text-amber-400 hover:border-amber-500/50 hover:bg-amber-500/20'}`}
                       >
-                        {isZeroSampling ? t_calib.sampling : t_calib.zeroTitle}
+                        <div className={`w-8 h-8 rounded-lg flex items-center justify-center flex-shrink-0 ${zeroCalibResult !== null ? 'bg-amber-500 text-white' : 'bg-amber-500/20 text-amber-500'}`}>
+                          {zeroCalibResult !== null ? <CheckCircle2 size={16} /> : <Zap size={16} />}
+                        </div>
+                        <span className="text-xs font-black uppercase tracking-widest transition-colors">{isZeroSampling ? t_calib.sampling : t_calib.zeroTitle}</span>
                         {isZeroSampling && (
                           <div ref={zeroBarRef} className="absolute bottom-0 left-0 h-1 bg-amber-500" />
                         )}
@@ -953,7 +979,7 @@ function App() {
                       )}
                     </div>
                     <div className="min-h-[24px] mt-2 flex items-center justify-center">
-                      {zeroCalibStatus !== 'IDLE' && zeroCalibStatus && <p className={`text-xs font-bold text-center uppercase tracking-widest ${zeroCalibStatus === 'SUCCESS' ? 'text-emerald-500' : 'text-red-500'}`}>{zeroCalibStatus}</p>}
+                      {zeroCalibStatus !== 'IDLE' && zeroCalibStatus && <p className={`text-xs font-bold text-center uppercase tracking-widest ${zeroCalibStatus === 'SUCCESS' ? 'text-emerald-500' : 'text-red-500'}`}>{zeroCalibStatus === 'SUCCESS' ? (language === 'zh' ? '校准成功' : 'SUCCESS') : (language === 'zh' ? '校准失败' : 'FAILED')}</p>}
                     </div>
                   </div>
 
@@ -998,7 +1024,7 @@ function App() {
                     <div className="min-h-[24px] mt-2 flex items-center justify-center">
                       {["NW", "SW"].some(k => spatialCalibStatus[k] !== 'IDLE') && (
                         <p className={`text-xs font-bold text-center uppercase tracking-widest ${["NW", "SW"].some(k => spatialCalibStatus[k] === 'SUCCESS') ? 'text-emerald-500' : 'text-red-500'}`}>
-                          {["NW", "SW"].every(k => spatialCalibStatus[k] === 'SUCCESS') ? (language === 'zh' ? '校准完成' : 'COMPLETE') : (["NW", "SW"].some(k => spatialCalibStatus[k] === 'SUCCESS') ? (language === 'zh' ? '部分完成' : 'PARTIAL') : (language === 'zh' ? '校准失败' : 'FAILED'))}
+                          {["NW", "SW"].every(k => spatialCalibStatus[k] === 'SUCCESS') ? (language === 'zh' ? '校准成功' : 'SUCCESS') : (["NW", "SW"].some(k => spatialCalibStatus[k] === 'SUCCESS') ? (language === 'zh' ? '部分成功' : 'PARTIAL') : (language === 'zh' ? '校准失败' : 'FAILED'))}
                         </p>
                       )}
                     </div>
@@ -1008,9 +1034,9 @@ function App() {
                 <div className="mt-auto pt-6 flex flex-col gap-2 border-t border-slate-200 dark:border-white/5">
                   <div className="flex gap-4">
                     <button onClick={resetCalibration} className="flex-1 py-4 rounded-2xl bg-red-100 dark:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 font-black hover:bg-red-200 text-xs uppercase tracking-widest flex items-center justify-center gap-2 transition-all"><Trash2 size={16} /> {t_calib.clear}</button>
-                    <button onClick={() => { if (allCalibrated) finishCalibration(); setViewMode('COMPASS'); }} disabled={!(zeroCalibStatus === 'SUCCESS' || allCalibrated)} className={`flex-[2] py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest shadow-xl active:scale-95 ${(zeroCalibStatus === 'SUCCESS' || allCalibrated) ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600'}`}>{t_calib.confirm}</button>
+                    <button onClick={() => { if (allCalibrated) finishCalibration(); setViewMode('COMPASS'); }} disabled={!(zeroCalibResult !== null || allCalibrated)} className={`flex-[2] py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 uppercase text-xs tracking-widest shadow-xl active:scale-95 ${(zeroCalibResult !== null || allCalibrated) ? 'bg-cyan-600 hover:bg-cyan-500 text-white' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600'}`}>{t_calib.confirm}</button>
                   </div>
-                  {!(zeroCalibStatus === 'SUCCESS' || allCalibrated) && (
+                  {!(zeroCalibResult !== null || allCalibrated) && (
                     <p className="text-xs text-slate-400 dark:text-slate-500 text-center font-medium">{language === 'zh' ? '请完成零点校准或方向校准' : 'Complete zero calibration or direction calibration'}</p>
                   )}
                 </div>
