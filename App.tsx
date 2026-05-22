@@ -1044,6 +1044,7 @@ function App() {
               onZeroCalibrate={handleZeroCalibrate}
               isZeroSampling={isZeroSampling}
               zeroCalibStatus={zeroCalibStatus}
+              zeroCalibResult={zeroCalibResult}
               // New Spatial Calibration & Navigation props
               onSpatialCalibrate={startSampling}
               calibRefVectors={calibRefVectors}

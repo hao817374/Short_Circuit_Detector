@@ -29,6 +29,7 @@ interface DebugChartProps {
   onZeroCalibrate: () => void;
   isZeroSampling: boolean;
   zeroCalibStatus: 'IDLE' | 'SUCCESS' | 'FAILED';
+  zeroCalibResult: { q0: number; q1: number; bias: number } | null;
 
   // Spatial Calibration Props
   onSpatialCalibrate: (step: 'NW' | 'SW') => void;
@@ -59,7 +60,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
     win2Offset, onWin2OffsetChange,
     globalOffset, onGlobalOffsetChange,
     directionMap, calibMatrix,
-    onZeroCalibrate, isZeroSampling, zeroCalibStatus,
+    onZeroCalibrate, isZeroSampling, zeroCalibStatus, zeroCalibResult,
     onSpatialCalibrate, calibRefVectors, samplingStep,
     onBack, language
 }) => {
@@ -207,99 +208,99 @@ export const DebugChart: React.FC<DebugChartProps> = ({
 
   return (
     <div className="w-full h-full flex flex-col gap-6 relative min-h-0">
-      <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto] gap-6 bg-slate-100/80 dark:bg-slate-900/60 border border-slate-300 dark:border-white/5 p-6 rounded-[2.5rem] backdrop-blur-2xl shrink-0 items-center shadow-2xl transition-colors duration-300">
-         <div className="flex flex-col gap-4">
-            <div className="flex items-center gap-3">
-                <button 
-                    onClick={onBack}
-                    className="p-3 bg-white dark:bg-slate-800/80 rounded-2xl text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-lg group"
-                >
-                    <BackIcon size={24} className="group-hover:-translate-x-1 transition-transform" />
-                </button>
-                <div className="flex gap-2">
-                  <button onClick={onTogglePause} className={`flex items-center gap-2 px-5 py-3 rounded-2xl border text-[10px] font-black tracking-widest transition-all ${isPaused ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-500 shadow-xl' : 'bg-white dark:bg-slate-800/50 border-slate-300 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
-                      {isPaused ? <Play size={14} fill="currentColor" /> : <Pause size={14} fill="currentColor" />} {isPaused ? "RESUME" : "PAUSE"}
-                  </button>
-                  <button onClick={onZeroCalibrate} disabled={isZeroSampling} className={`flex items-center gap-2 px-5 py-3 rounded-2xl border transition-all text-[10px] font-black tracking-widest shadow-inner ${isZeroSampling ? 'bg-cyan-100 dark:bg-cyan-500/20 border-cyan-500 text-cyan-600 dark:text-cyan-400' : 'border-cyan-300 dark:border-cyan-500/40 bg-white dark:bg-cyan-600/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-600/20'}`}>
-                      {isZeroSampling ? <Loader2 size={14} className="animate-spin" /> : <Target size={14} />} 
-                      {isZeroSampling ? "SAMPLING..." : "ZERO CALIB"}
-                  </button>
-                </div>
-            </div>
-            <div className="flex items-center gap-2">
-                <button 
-                    onClick={() => onSpatialCalibrate('SW')} 
-                    disabled={!!samplingStep}
-                    className={`px-4 py-2 rounded-xl border text-[9px] font-black tracking-tighter transition-all flex items-center gap-2 ${samplingStep === 'SW' ? 'bg-emerald-500 text-white animate-pulse' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-white/10 text-slate-500 dark:text-emerald-500 hover:border-emerald-500/50'}`}
-                >
-                    <ArrowDownLeft size={12} /> {language === 'zh' ? '右下采集' : 'SW CALIB'}
-                    {calibRefVectors['SW'] && <span className="ml-1 opacity-60 font-mono">({calibRefVectors['SW'].q0.toFixed(0)})</span>}
-                </button>
-                <button 
-                    onClick={() => onSpatialCalibrate('NW')} 
-                    disabled={!!samplingStep}
-                    className={`px-4 py-2 rounded-xl border text-[9px] font-black tracking-tighter transition-all flex items-center gap-2 ${samplingStep === 'NW' ? 'bg-violet-500 text-white animate-pulse' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-white/10 text-slate-500 dark:text-violet-500 hover:border-violet-500/50'}`}
-                >
-                    <ArrowUpLeft size={12} /> {language === 'zh' ? '右上采集' : 'NW CALIB'}
-                    {calibRefVectors['NW'] && <span className="ml-1 opacity-60 font-mono">({calibRefVectors['NW'].q0.toFixed(0)})</span>}
-                </button>
-            </div>
-            <div className="flex items-center gap-4">
-                <div className="flex items-center gap-3 bg-white dark:bg-slate-950/80 p-3 rounded-2xl border border-slate-300 dark:border-white/5 shadow-inner transition-colors duration-300">
-                    <div className="flex items-center gap-2 pr-4 border-r border-slate-300 dark:border-white/5"><Zap size={16} className="text-amber-500" /><span className="text-[10px] font-black text-slate-500 uppercase tracking-widest">Bias</span></div>
-                    <input type="number" value={globalOffset} onChange={(e) => onGlobalOffsetChange(Number(e.target.value))} className="w-24 bg-slate-50 dark:bg-slate-900 border border-slate-300 dark:border-white/5 rounded-xl px-3 py-1 text-center font-mono text-[13px] outline-none text-cyan-600 dark:text-cyan-400 focus:border-cyan-500/50 transition-colors" />
-                </div>
-            </div>
-         </div>
+	      <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto] gap-6 bg-slate-100/80 dark:bg-slate-900/60 border border-slate-300 dark:border-white/5 p-6 rounded-[2.5rem] backdrop-blur-2xl shrink-0 items-center shadow-2xl transition-colors duration-300 min-h-[280px]">
+	         {/* Col 1: Back button only */}
+	         <div className="flex flex-col justify-start">
+	            <button
+	                onClick={onBack}
+	                className="p-3 bg-white dark:bg-slate-800/80 rounded-2xl text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-lg group"
+	            >
+	                <BackIcon size={24} className="group-hover:-translate-x-1 transition-transform" />
+	            </button>
+	         </div>
 
-         <div className="flex justify-center items-center gap-10 lg:px-10">
-            <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-800 shadow-[0_0_20px_rgba(0,0,0,0.1),inset_0_0_20px_rgba(0,0,0,0.03)] dark:shadow-[0_0_40px_rgba(0,0,0,0.6),inset_0_0_20px_rgba(255,255,255,0.03)] flex items-center justify-center transition-colors duration-300">
-                 <div className="absolute top-3 text-[8px] font-black text-slate-400 dark:text-slate-600 tracking-widest uppercase font-mono">STATUS</div>
-                 <div className="z-10 animate-in zoom-in duration-300">{directionInfo.icon || <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse" />}</div>
-                 <div className="absolute bottom-3"><span className="text-[11px] font-black text-slate-800 dark:text-white uppercase tracking-tighter drop-shadow-md">{directionInfo.text}</span></div>
-            </div>
-            <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-800 shadow-[0_0_20px_rgba(0,0,0,0.1),inset_0_0_20px_rgba(0,0,0,0.03)] dark:shadow-[0_0_40px_rgba(0,0,0,0.6),inset_0_0_20px_rgba(255,255,255,0.03)] flex items-center justify-center overflow-hidden transition-colors duration-300">
-                 <div className="absolute top-3 text-[8px] font-black text-slate-400 dark:text-slate-600 tracking-widest uppercase font-mono">ANGLE</div>
-                 <div className="absolute inset-0 flex items-center justify-center transition-transform duration-300 ease-out" style={{ transform: `rotate(${90 - rawAngle}deg)` }}>
-                    <div className="w-1 h-1/2 bg-amber-500 shadow-[0_0_15px_#f59e0b] origin-bottom -translate-y-1/2 opacity-80"></div>
-                 </div>
-                 <div className="z-10 bg-white/95 dark:bg-slate-950/95 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10 shadow-2xl backdrop-blur-md">
-                    <span className="text-base font-mono font-black text-amber-500 tabular-nums">{data.length > 0 ? Math.round(rawAngle) : "--"}°</span>
-                 </div>
-            </div>
-            <div className="relative w-32 h-32 sm:w-36 sm:h-36 rounded-full bg-white dark:bg-slate-950 border-2 border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.1)] flex items-center justify-center overflow-hidden transition-colors duration-300">
-                 <div className="absolute top-3 text-[8px] font-black text-cyan-600/50 dark:text-cyan-500/50 tracking-widest uppercase font-mono">MAP</div>
-                 <div className="absolute inset-0 flex items-center justify-center transition-transform duration-700 cubic-bezier(0.19, 1, 0.22, 1)" style={{ transform: `rotate(${calibratedHeading}deg)` }}><div className="w-2 h-1/2 bg-cyan-500 dark:bg-cyan-400 shadow-[0_0_25px_#22d3ee] origin-bottom -translate-y-1/2 rounded-full"></div></div>
-                 <div className="z-10 bg-white/95 dark:bg-slate-950/95 p-3 rounded-full border border-cyan-500/40 shadow-2xl">
-                    <Navigation size={22} className="text-cyan-500 dark:text-cyan-400" />
-                 </div>
-            </div>
-         </div>
+	         {/* Col 2: Three circles + pause button centered below */}
+	         <div className="flex flex-col items-center gap-4">
+	            <div className="flex justify-center items-center gap-4">
+	               <div className="relative w-40 h-40 rounded-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-800 shadow-[0_0_20px_rgba(0,0,0,0.1),inset_0_0_20px_rgba(0,0,0,0.03)] dark:shadow-[0_0_40px_rgba(0,0,0,0.6),inset_0_0_20px_rgba(255,255,255,0.03)] flex items-center justify-center transition-colors duration-300">
+	                  <div className="absolute top-4 text-[10px] font-black text-slate-400 dark:text-slate-600 tracking-widest uppercase font-mono">STATUS</div>
+	                  <div className="z-10 animate-in zoom-in duration-300">{directionInfo.icon || <div className="w-5 h-5 rounded-full bg-slate-200 dark:bg-slate-800 animate-pulse" />}</div>
+	                  <div className="absolute bottom-4"><span className="text-sm font-black text-slate-800 dark:text-white uppercase tracking-tighter drop-shadow-md">{directionInfo.text}</span></div>
+	               </div>
+	               <div className="relative w-40 h-40 rounded-full bg-white dark:bg-slate-950 border-2 border-slate-300 dark:border-slate-800 shadow-[0_0_20px_rgba(0,0,0,0.1),inset_0_0_20px_rgba(0,0,0,0.03)] dark:shadow-[0_0_40px_rgba(0,0,0,0.6),inset_0_0_20px_rgba(255,255,255,0.03)] flex items-center justify-center overflow-hidden transition-colors duration-300">
+	                  <div className="absolute top-4 text-[10px] font-black text-slate-400 dark:text-slate-600 tracking-widest uppercase font-mono">ANGLE</div>
+	                  <div className="absolute inset-0 flex items-center justify-center transition-transform duration-300 ease-out" style={{ transform: `rotate(${90 - rawAngle}deg)` }}>
+	                     <div className="w-1 h-1/2 bg-amber-500 shadow-[0_0_15px_#f59e0b] origin-bottom -translate-y-1/2 opacity-80"></div>
+	                  </div>
+	                  <div className="z-10 bg-white/95 dark:bg-slate-950/95 px-4 py-2 rounded-xl border border-slate-200 dark:border-white/10 shadow-2xl backdrop-blur-md">
+	                     <span className="text-base font-mono font-black text-amber-500 tabular-nums">{data.length > 0 ? Math.round(rawAngle) : "--"}°</span>
+	                  </div>
+	               </div>
+	               <div className="relative w-40 h-40 rounded-full bg-white dark:bg-slate-950 border-2 border-cyan-500/40 shadow-[0_0_20px_rgba(6,182,212,0.1)] flex items-center justify-center overflow-hidden transition-colors duration-300">
+	                  <div className="absolute top-4 text-[10px] font-black text-cyan-600/50 dark:text-cyan-500/50 tracking-widest uppercase font-mono">MAP</div>
+	                  <div className="absolute inset-0 flex items-center justify-center transition-transform duration-700 cubic-bezier(0.19, 1, 0.22, 1)" style={{ transform: `rotate(${calibratedHeading}deg)` }}><div className="w-2 h-1/2 bg-cyan-500 dark:bg-cyan-400 shadow-[0_0_25px_#22d3ee] origin-bottom -translate-y-1/2 rounded-full"></div></div>
+	                  <div className="z-10 bg-white/95 dark:bg-slate-950/95 p-3 rounded-full border border-cyan-500/40 shadow-2xl">
+	                     <Navigation size={22} className="text-cyan-500 dark:text-cyan-400" />
+	                  </div>
+	               </div>
+	            </div>
+	            <button onClick={onTogglePause} className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl border text-xs font-black tracking-widest transition-all ${isPaused ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-500 shadow-xl' : 'bg-white dark:bg-slate-800/50 border-slate-300 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
+	               {isPaused ? <Play size={14} fill="currentColor" /> : <Pause size={14} fill="currentColor" />} {isPaused ? "RESUME" : "PAUSE"}
+	            </button>
+	         </div>
 
-         <div className="flex flex-col gap-3">
-            <div className="flex items-center justify-end gap-4">
-                <div className="bg-white dark:bg-slate-950/95 px-6 py-3 rounded-2xl border border-slate-300 dark:border-emerald-500/20 min-w-[150px] flex flex-col items-center shadow-inner group transition-all dark:hover:border-emerald-500/40">
-                    <span className="text-[9px] text-emerald-600 dark:text-emerald-500 font-black uppercase tracking-[0.2em] mb-1 opacity-70">Q0 CHANNEL</span>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-xl font-mono font-black text-slate-800 dark:text-white leading-none tracking-tight">{corrQ0.toFixed(1)}</span>
-                        <span className="text-xs font-mono text-emerald-600/50 dark:text-emerald-500/50" title="校正前">({rawQ0.toFixed(0)})</span>
-                    </div>
-                </div>
-                <input type="number" value={win1Offset} onChange={(e) => onWin1OffsetChange(Number(e.target.value))} className="w-20 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-white/5 rounded-xl py-2.5 text-[13px] font-mono text-emerald-600 dark:text-emerald-400 text-center outline-none focus:border-emerald-500/50 dark:focus:bg-slate-800 transition-all shadow-inner" />
-            </div>
-            <div className="flex items-center justify-end gap-4">
-                <div className="bg-white dark:bg-slate-950/95 px-6 py-3 rounded-2xl border border-slate-300 dark:border-violet-500/20 min-w-[150px] flex flex-col items-center shadow-inner group transition-all dark:hover:border-violet-500/40">
-                    <span className="text-[9px] text-violet-600 dark:text-violet-500 font-black uppercase tracking-[0.2em] mb-1 opacity-70">Q1 CHANNEL</span>
-                    <div className="flex items-baseline gap-2">
-                        <span className="text-xl font-mono font-black text-slate-800 dark:text-white leading-none tracking-tight">{corrQ1.toFixed(1)}</span>
-                        <span className="text-xs font-mono text-violet-600/50 dark:text-violet-500/50" title="校正前">({rawQ1.toFixed(0)})</span>
-                     </div>
-                </div>
-                <input type="number" value={win2Offset} onChange={(e) => onWin2OffsetChange(Number(e.target.value))} className="w-20 bg-slate-50 dark:bg-slate-800/80 border border-slate-300 dark:border-white/5 rounded-xl py-2.5 text-[13px] font-mono text-violet-600 dark:text-violet-400 text-center outline-none focus:border-violet-500/50 dark:focus:bg-slate-800 transition-all shadow-inner" />
-            </div>
-         </div>
-      </div>
-
+	         {/* Col 3: 3-row calibration grid */}
+	         <div className="flex flex-col gap-3">
+	            {/* Row 1: Zero Calib */}
+	            <div className="flex items-center gap-3">
+	               <button onClick={onZeroCalibrate} disabled={isZeroSampling} className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border transition-all text-xs font-black tracking-widest shadow-inner flex-1 ${isZeroSampling ? 'bg-cyan-100 dark:bg-cyan-500/20 border-cyan-500 text-cyan-600 dark:text-cyan-400' : 'border-cyan-300 dark:border-cyan-500/40 bg-white dark:bg-cyan-600/10 text-cyan-600 dark:text-cyan-400 hover:bg-cyan-50 dark:hover:bg-cyan-600/20'}`}>
+	                  {isZeroSampling ? <Loader2 size={14} className="animate-spin" /> : <Target size={14} />}
+	                  {isZeroSampling ? (language === 'zh' ? '采样中...' : 'SAMPLING...') : (language === 'zh' ? '零点校准' : 'ZERO CALIB')}
+	               </button>
+	               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[180px] justify-center">
+	                  {zeroCalibStatus === 'SUCCESS' && zeroCalibResult ? (
+	                     <><span className="text-slate-400 dark:text-slate-500">Q0:</span><span className="text-cyan-600 dark:text-cyan-400 font-bold w-16 text-right tabular-nums">{zeroCalibResult.q0}</span><span className="text-slate-400 dark:text-slate-500 ml-2">Q1:</span><span className="text-cyan-600 dark:text-cyan-400 font-bold w-16 text-right tabular-nums">{zeroCalibResult.q1}</span></>
+	                  ) : (
+	                     <span className="text-slate-400 dark:text-slate-600">{language === 'zh' ? '等待校准' : 'AWAIT CALIB'}</span>
+	                  )}
+	               </div>
+	            </div>
+	            {/* Row 2: NW Calib (右上采集) */}
+	            <div className="flex items-center gap-3">
+	               <button
+	                  onClick={() => onSpatialCalibrate('NW')}
+	                  disabled={!!samplingStep}
+	                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-black tracking-widest transition-all flex-1 ${samplingStep === 'NW' ? 'bg-violet-500 text-white animate-pulse' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-white/10 text-slate-500 dark:text-violet-500 hover:border-violet-500/50'}`}
+	               >
+	                  <ArrowUpRight size={14} /> {language === 'zh' ? '右上采集' : 'NW CALIB'}
+	               </button>
+	               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[180px] justify-center">
+	                  {calibRefVectors['NW'] ? (
+	                     <><span className="text-cyan-500 dark:text-cyan-400">Q0:</span><span className="text-cyan-600 dark:text-cyan-300 font-bold w-16 text-right tabular-nums">{Math.round(calibRefVectors['NW']!.q0)}</span><span className="text-cyan-500 dark:text-cyan-400 ml-2">Q1:</span><span className="text-cyan-600 dark:text-cyan-300 font-bold w-16 text-right tabular-nums">{Math.round(calibRefVectors['NW']!.q1)}</span></>
+	                  ) : (
+	                     <span className="text-slate-400 dark:text-slate-600">{language === 'zh' ? '等待采集' : 'AWAIT SAMPLE'}</span>
+	                  )}
+	               </div>
+	            </div>
+	            {/* Row 3: SW Calib (右下采集) */}
+	            <div className="flex items-center gap-3">
+	               <button
+	                  onClick={() => onSpatialCalibrate('SW')}
+	                  disabled={!!samplingStep}
+	                  className={`flex items-center gap-2 px-4 py-2.5 rounded-xl border text-xs font-black tracking-widest transition-all flex-1 ${samplingStep === 'SW' ? 'bg-emerald-500 text-white animate-pulse' : 'bg-white dark:bg-slate-800 border-slate-300 dark:border-white/10 text-slate-500 dark:text-emerald-500 hover:border-emerald-500/50'}`}
+	               >
+	                  <ArrowDownRight size={14} /> {language === 'zh' ? '右下采集' : 'SW CALIB'}
+	               </button>
+	               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[180px] justify-center">
+	                  {calibRefVectors['SW'] ? (
+	                     <><span className="text-cyan-500 dark:text-cyan-400">Q0:</span><span className="text-cyan-600 dark:text-cyan-300 font-bold w-16 text-right tabular-nums">{Math.round(calibRefVectors['SW']!.q0)}</span><span className="text-cyan-500 dark:text-cyan-400 ml-2">Q1:</span><span className="text-cyan-600 dark:text-cyan-300 font-bold w-16 text-right tabular-nums">{Math.round(calibRefVectors['SW']!.q1)}</span></>
+	                  ) : (
+	                     <span className="text-slate-400 dark:text-slate-600">{language === 'zh' ? '等待采集' : 'AWAIT SAMPLE'}</span>
+	                  )}
+	               </div>
+	            </div>
+	         </div>
+	      </div>
       <div ref={containerRef} className="relative flex-grow min-h-[240px] max-h-[320px] w-full bg-slate-100 dark:bg-[#030712] border border-slate-300 dark:border-slate-800/60 rounded-[3rem] overflow-hidden shadow-2xl flex flex-col transition-colors duration-500">
          {data.length === 0 ? (
              <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-800 font-mono uppercase text-sm tracking-[0.4em] animate-pulse">Signal Monitoring Offline</div>
