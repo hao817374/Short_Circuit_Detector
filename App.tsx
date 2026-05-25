@@ -151,13 +151,16 @@ function App() {
     }
   }, [isZeroSampling]);
 
+  const [samplingStep, setSamplingStep] = useState<string | null>(null);
+
   // Refs for high-speed loop access
   const stateRef = useRef({
     w1Idx: 25, w2Idx: 75, gOff: 160,
     w1Off: 0, w2Off: 0,
     matrix: [1, 0, 0, 1] as [number, number, number, number],
     probeT: -4300,
-    isZeroSampling: false
+    isZeroSampling: false,
+    samplingStep: null as string | null
   });
 
   useEffect(() => {
@@ -166,14 +169,14 @@ function App() {
       w1Off: win1Offset, w2Off: win2Offset,
       matrix: calibMatrix,
       probeT: probeThreshold,
-      isZeroSampling: isZeroSampling
+      isZeroSampling: isZeroSampling,
+      samplingStep: samplingStep
     };
-  }, [win1Index, win2Index, globalOffset, win1Offset, win2Offset, calibMatrix, probeThreshold, isZeroSampling]);
+  }, [win1Index, win2Index, globalOffset, win1Offset, win2Offset, calibMatrix, probeThreshold, isZeroSampling, samplingStep]);
 
   const [isCalibrating2P, setIsCalibrating2P] = useState(false);
   const [calibRefVectors, setCalibRefVectors] = useState<Record<string, { q0: number, q1: number } | null>>({ "NW": null, "SW": null });
   const [spatialCalibStatus, setSpatialCalibStatus] = useState<Record<string, 'IDLE' | 'SUCCESS' | 'FAILED'>>({ "NW": 'IDLE', "SW": 'IDLE' });
-  const [samplingStep, setSamplingStep] = useState<string | null>(null);
   const [sampleProgress, setSampleProgress] = useState(0);
   const samplingBuffer = useRef<{ q0: number, q1: number }[]>([]);
   const currentRawValuesRef = useRef<{ q0: number, q1: number }>({ q0: 0, q1: 0 });
@@ -220,7 +223,7 @@ function App() {
       const rawAngle = Math.atan2(corrQ1, corrQ0) * 180 / Math.PI;
 
       // 方向校准采样 — 采集带偏移补偿的 raw 值
-      if (samplingStep !== null) {
+      if (stateRef.current.samplingStep !== null) {
         samplingBuffer.current.push({ q0: rawQ0, q1: rawQ1 });
       }
 
@@ -352,6 +355,13 @@ function App() {
       if (elapsed >= 1000) {
         clearInterval(timer);
         const samples = samplingBuffer.current;
+        if (samples.length === 0) {
+          setCalibRefVectors(prev => ({ ...prev, [step]: { q0: currentRawValuesRef.current.q0, q1: currentRawValuesRef.current.q1 } }));
+          setSpatialCalibStatus(prev => ({ ...prev, [step]: 'SUCCESS' }));
+          setTimeout(() => setSpatialCalibStatus(prev => ({ ...prev, [step]: 'IDLE' })), 3000);
+          setSamplingStep(null);
+          return;
+        }
         if (samples.length < 5) {
           setSpatialCalibStatus(prev => ({ ...prev, [step]: 'FAILED' }));
           setTimeout(() => setSpatialCalibStatus(prev => ({ ...prev, [step]: 'IDLE' })), 3000);
@@ -1104,6 +1114,7 @@ function App() {
               isZeroSampling={isZeroSampling}
               zeroCalibStatus={zeroCalibStatus}
               zeroCalibResult={zeroCalibResult}
+              zeroCalibEverRun={zeroCalibEverRun}
               // New Spatial Calibration & Navigation props
               onSpatialCalibrate={startSampling}
               calibRefVectors={calibRefVectors}

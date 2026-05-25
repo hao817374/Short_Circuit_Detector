@@ -30,6 +30,7 @@ interface DebugChartProps {
   isZeroSampling: boolean;
   zeroCalibStatus: 'IDLE' | 'SUCCESS' | 'FAILED';
   zeroCalibResult: { q0: number; q1: number; bias: number } | null;
+  zeroCalibEverRun?: boolean;
 
   // Spatial Calibration Props
   onSpatialCalibrate: (step: 'NW' | 'SW') => void;
@@ -60,7 +61,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
     win2Offset, onWin2OffsetChange,
     globalOffset, onGlobalOffsetChange,
     directionMap, calibMatrix,
-    onZeroCalibrate, isZeroSampling, zeroCalibStatus, zeroCalibResult,
+    onZeroCalibrate, isZeroSampling, zeroCalibStatus, zeroCalibResult, zeroCalibEverRun,
     onSpatialCalibrate, calibRefVectors, samplingStep,
     onBack, language
 }) => {
@@ -210,7 +211,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
     <div className="w-full h-full flex flex-col gap-6 relative min-h-0">
 	      <div className="grid grid-cols-1 lg:grid-cols-[auto_1fr_auto] gap-6 bg-slate-100/80 dark:bg-slate-900/60 border border-slate-300 dark:border-white/5 p-6 rounded-[2.5rem] backdrop-blur-2xl shrink-0 items-center shadow-2xl transition-colors duration-300 min-h-[280px]">
 	         {/* Col 1: Back button only */}
-	         <div className="flex flex-col justify-start">
+	         <div className="flex flex-col justify-start self-start">
 	            <button
 	                onClick={onBack}
 	                className="p-3 bg-white dark:bg-slate-800/80 rounded-2xl text-slate-600 dark:text-slate-400 border border-slate-300 dark:border-white/5 hover:bg-slate-50 dark:hover:bg-slate-700 transition-all shadow-lg group"
@@ -244,9 +245,19 @@ export const DebugChart: React.FC<DebugChartProps> = ({
 	                  </div>
 	               </div>
 	            </div>
+		            <div className="flex items-center gap-3">
+		               <div className="px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs">
+		                  <span className="text-slate-400 dark:text-slate-500">Q0:</span>
+		                  <span className="text-cyan-600 dark:text-cyan-400 font-bold tabular-nums ml-1">{Math.round(rawQ0)}</span>
+		               </div>
 	            <button onClick={onTogglePause} className={`flex items-center gap-2 px-5 py-2.5 rounded-2xl border text-xs font-black tracking-widest transition-all ${isPaused ? 'bg-amber-100 dark:bg-amber-500/20 border-amber-500 text-amber-600 dark:text-amber-500 shadow-xl' : 'bg-white dark:bg-slate-800/50 border-slate-300 dark:border-white/5 text-slate-600 dark:text-slate-300 hover:bg-slate-50 dark:hover:bg-slate-800'}`}>
 	               {isPaused ? <Play size={14} fill="currentColor" /> : <Pause size={14} fill="currentColor" />} {isPaused ? "RESUME" : "PAUSE"}
 	            </button>
+		               <div className="px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs">
+		                  <span className="text-slate-400 dark:text-slate-500">Q1:</span>
+		                  <span className="text-cyan-600 dark:text-cyan-400 font-bold tabular-nums ml-1">{Math.round(rawQ1)}</span>
+		               </div>
+		            </div>
 	         </div>
 
 	         {/* Col 3: 3-row calibration grid */}
@@ -257,13 +268,15 @@ export const DebugChart: React.FC<DebugChartProps> = ({
 	                  {isZeroSampling ? <Loader2 size={14} className="animate-spin" /> : <Target size={14} />}
 	                  {isZeroSampling ? (language === 'zh' ? '采样中...' : 'SAMPLING...') : (language === 'zh' ? '零点校准' : 'ZERO CALIB')}
 	               </button>
-	               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[180px] justify-center">
-	                  {zeroCalibStatus === 'SUCCESS' && zeroCalibResult ? (
-	                     <><span className="text-slate-400 dark:text-slate-500">Q0:</span><span className="text-cyan-600 dark:text-cyan-400 font-bold w-16 text-right tabular-nums">{zeroCalibResult.q0}</span><span className="text-slate-400 dark:text-slate-500 ml-2">Q1:</span><span className="text-cyan-600 dark:text-cyan-400 font-bold w-16 text-right tabular-nums">{zeroCalibResult.q1}</span></>
-	                  ) : (
-	                     <span className="text-slate-400 dark:text-slate-600">{language === 'zh' ? '等待校准' : 'AWAIT CALIB'}</span>
-	                  )}
-	               </div>
+		               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[240px] justify-center">
+		                  {zeroCalibResult !== null ? (
+		                     <><span className="text-slate-400 dark:text-slate-500">Q0:</span><span className="text-cyan-600 dark:text-cyan-400 font-bold tabular-nums">{zeroCalibResult.q0}</span><span className="text-slate-400 dark:text-slate-500 ml-2">Q1:</span><span className="text-cyan-600 dark:text-cyan-400 font-bold tabular-nums">{zeroCalibResult.q1}</span><span className="text-slate-400 dark:text-slate-500 ml-2">BIAS:</span><span className="text-amber-600 dark:text-amber-400 font-bold tabular-nums">{zeroCalibResult.bias}</span></>
+		                  ) : (zeroCalibEverRun ? (
+		                     <><span className="text-slate-400 dark:text-slate-500">Q0:</span><span className="text-red-400 dark:text-red-500 font-bold tabular-nums w-10 text-center">NULL</span><span className="text-slate-400 dark:text-slate-500 ml-2">Q1:</span><span className="text-red-400 dark:text-red-500 font-bold tabular-nums w-10 text-center">NULL</span><span className="text-slate-400 dark:text-slate-500 ml-2">BIAS:</span><span className="text-red-400 dark:text-red-500 font-bold tabular-nums w-10 text-center">NULL</span></>
+		                  ) : (
+		                     <span className="text-slate-400 dark:text-slate-600">{language === 'zh' ? '等待校准' : 'AWAIT CALIB'}</span>
+		                  ))}
+		               </div>
 	            </div>
 	            {/* Row 2: NW Calib (右上采集) */}
 	            <div className="flex items-center gap-3">
