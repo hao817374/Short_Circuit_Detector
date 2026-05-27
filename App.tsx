@@ -117,6 +117,11 @@ function App() {
   // Device identity for auto-connect filtering (VID/PID learned on first connection)
   const [deviceVid, setDeviceVid] = usePersistentState<number | null>('cfg_deviceVid', null);
   const [devicePid, setDevicePid] = usePersistentState<number | null>('cfg_devicePid', null);
+  // ref 副本供 findMatchingPort 闭包读取最新值（避免 useEffect([]) 闭包过期）
+  const deviceVidRef = useRef(deviceVid);
+  const devicePidRef = useRef(devicePid);
+  useEffect(() => { deviceVidRef.current = deviceVid; }, [deviceVid]);
+  useEffect(() => { devicePidRef.current = devicePid; }, [devicePid]);
 
   const [calibMatrix, setCalibMatrix] = usePersistentState<[number, number, number, number]>('cfg_calibMatrix', [1, 0, 0, 1]);
   const [balanceFactor, setBalanceFactor] = usePersistentState('cfg_balanceFactor', 1.0);
@@ -544,9 +549,9 @@ function App() {
         // @ts-ignore - getInfo() is part of Web Serial API spec
         const info = p.getInfo();
         if (info?.usbVendorId && info?.usbProductId
-          && deviceVid !== null && devicePid !== null
-          && info.usbVendorId === deviceVid
-          && info.usbProductId === devicePid) {
+          && deviceVidRef.current !== null && devicePidRef.current !== null
+          && info.usbVendorId === deviceVidRef.current
+          && info.usbProductId === devicePidRef.current) {
           return p;
         }
       } catch (e) { /* getInfo not supported on this platform */ }
