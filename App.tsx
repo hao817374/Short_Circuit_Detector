@@ -111,7 +111,7 @@ function App() {
 
   const [win1Offset, setWin1Offset] = usePersistentState('cfg_win1Offset', 0);
   const [win2Offset, setWin2Offset] = usePersistentState('cfg_win2Offset', 0);
-  const [probeThreshold, setProbeThreshold] = usePersistentState('cfg_probeThreshold', -4300);
+  const [probeThreshold, setProbeThreshold] = usePersistentState('cfg_probeThreshold', -3000);
 
   // Device identity for auto-connect filtering (VID/PID learned on first connection)
   const [deviceVid, setDeviceVid] = usePersistentState<number | null>('cfg_deviceVid', null);
@@ -147,7 +147,7 @@ function App() {
     w1Idx: 25, w2Idx: 75, gOff: 160,
     w1Off: 0, w2Off: 0,
     matrix: [1, 0, 0, 1] as [number, number, number, number],
-    probeT: -4300,
+    probeT: -3000,
     isZeroSampling: false,
     samplingStep: null as string | null
   });
@@ -1064,8 +1064,8 @@ function App() {
                     </div>
                     <div className="min-h-[24px] mt-2 flex items-center justify-center">
                       {["NW", "SW"].some(k => spatialCalibStatus[k] !== 'IDLE') && (
-                        <p className={`text-xs font-bold text-center uppercase tracking-widest ${["NW", "SW"].some(k => spatialCalibStatus[k] === 'SUCCESS') ? 'text-emerald-500' : 'text-red-500'}`}>
-                          {["NW", "SW"].every(k => spatialCalibStatus[k] === 'SUCCESS') ? (language === 'zh' ? '校准成功' : 'SUCCESS') : (["NW", "SW"].some(k => spatialCalibStatus[k] === 'SUCCESS') ? (language === 'zh' ? '部分成功' : 'PARTIAL') : (language === 'zh' ? '校准失败' : 'FAILED'))}
+                        <p className={`text-xs font-bold text-center uppercase tracking-widest ${["NW", "SW"].some(k => spatialCalibStatus[k] === 'FAILED') ? 'text-red-500' : 'text-emerald-500'}`}>
+                          {["NW", "SW"].some(k => spatialCalibStatus[k] === 'FAILED') ? (language === 'zh' ? '校准失败' : 'FAILED') : (language === 'zh' ? '校准成功' : 'SUCCESS')}
                         </p>
                       )}
                     </div>

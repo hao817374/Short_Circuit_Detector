@@ -89,6 +89,17 @@ export const DebugChart: React.FC<DebugChartProps> = ({
     const range = Math.max(40, dataMax - dataMin);
     return { min: Math.floor(dataMin - range * 0.12), max: Math.ceil(dataMax + range * 0.12) };
   }, [data, globalOffset]);
+	const { waveMin, waveMax, waveRange } = useMemo(() => {
+		if (data.length === 0) return { waveMin: 0, waveMax: 0, waveRange: 0 };
+		let wMin = Infinity, wMax = -Infinity;
+		for (const p of data) {
+			const v = p.value + globalOffset;
+			if (v < wMin) wMin = v;
+			if (v > wMax) wMax = v;
+		}
+		return { waveMin: Math.round(wMin), waveMax: Math.round(wMax), waveRange: Math.round(wMax - wMin) };
+	}, [data, globalOffset]);
+
 
   const padding = { top: 30, right: 30, bottom: 50, left: 80 }; 
   const contentWidth = Math.max(dimensions.width, 300);
@@ -312,6 +323,17 @@ export const DebugChart: React.FC<DebugChartProps> = ({
 	                  )}
 	               </div>
 	            </div>
+		            {/* Row 4: Waveform Min/Max */}
+		            <div className="flex items-center gap-3">
+		               <div className="flex items-center gap-2 px-4 py-2.5 rounded-xl border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-800 text-xs font-black tracking-widest flex-1 justify-center text-slate-500 dark:text-slate-400">
+		                  <Zap size={14} /> {language === 'zh' ? '波形范围' : 'WAVE RANGE'}
+		               </div>
+		               <div className="flex items-center gap-2 px-3 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-200 dark:border-white/5 font-mono text-xs min-w-[180px] justify-center">
+		                  <span className="text-slate-400 dark:text-slate-500">min:</span><span className="text-cyan-600 dark:text-cyan-400 font-bold tabular-nums w-14 text-right">{waveMin}</span>
+		                  <span className="text-slate-400 dark:text-slate-500 ml-1">max:</span><span className="text-cyan-600 dark:text-cyan-400 font-bold tabular-nums w-14 text-right">{waveMax}</span>
+		                  <span className="text-slate-400 dark:text-slate-500 ml-1">Δ:</span><span className="text-amber-500 dark:text-amber-400 font-bold tabular-nums w-14 text-right">{waveRange}</span>
+		               </div>
+		            </div>
 	         </div>
 	      </div>
       <div ref={containerRef} className="relative flex-grow min-h-[240px] max-h-[320px] w-full bg-slate-100 dark:bg-[#030712] border border-slate-300 dark:border-slate-800/60 rounded-[3rem] overflow-hidden shadow-2xl flex flex-col transition-colors duration-500">

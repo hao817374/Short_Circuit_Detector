@@ -100,7 +100,7 @@ export const Settings: React.FC<SettingsProps> = ({
       setLocalGlobalOffset(160);
       setLocalWin1Offset(0);
       setLocalWin2Offset(0);
-      setLocalProbeThreshold(-4300);
+      setLocalProbeThreshold(-3000);
       // Note: We update local state. User must still click Save to apply.
   };
 
@@ -124,7 +124,7 @@ export const Settings: React.FC<SettingsProps> = ({
     
     // Probe
     probeTitle: language === 'zh' ? "表笔断开判定" : "Probe Disconnect Detection",
-    probeDesc: language === 'zh' ? "当原始ADC值低于此阈值时，视为表笔断开。通常为负值（如 -4300）。" : "Raw ADC values below this threshold trigger 'Disconnected' status. Typically negative (e.g. -4300).",
+    probeDesc: language === 'zh' ? "当原始ADC值低于此阈值时，视为表笔断开。通常为负值（如 -3000）。" : "Raw ADC values below this threshold trigger 'Disconnected' status. Typically negative (e.g. -3000).",
 
     // Calibration
     bias: language === 'zh' ? "全局偏置 (Bias)" : "Global Bias (Offset)",
@@ -298,6 +298,25 @@ export const Settings: React.FC<SettingsProps> = ({
                         min={5} max={20} value={localThresholdStep}
                         onChange={(e) => setLocalThresholdStep(Number(e.target.value))}
                         className="w-full h-2.5 bg-slate-300 dark:bg-slate-800 rounded-lg appearance-none cursor-pointer accent-cyan-500 transition-all"
+                    />
+                </div>
+            </div>
+
+            {/* 表笔断开判定 */}
+            <div className="mb-6">
+                <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
+                    <div className="flex justify-between items-end mb-3">
+                        <div>
+                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest">{t.probeTitle}</label>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">{t.probeDesc}</p>
+                        </div>
+                        <span className="text-xl font-mono font-black text-red-500 dark:text-red-400">{localProbeThreshold}</span>
+                    </div>
+                    <input
+                        type="number"
+                        value={localProbeThreshold}
+                        onChange={(e) => setLocalProbeThreshold(Number(e.target.value))}
+                        className="w-32 px-4 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/10 font-mono text-sm font-bold text-red-500 dark:text-red-400 text-center focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all"
                     />
                 </div>
             </div>
