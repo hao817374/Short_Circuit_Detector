@@ -1,7 +1,7 @@
 {
   "name": "short-circuit-detector",
   "private": true,
-  "version": "1.0.9",
+  "version": "1.1.0",
   "type": "module",
   "main": "electron/main.cjs",
   "author": "CodePhoenix",
@@ -48,6 +48,11 @@
     "win": {
       "target": "nsis",
       "icon": "public/icon.png"
+    },
+    "linux": {
+      "target": ["AppImage", "deb"],
+      "icon": "public/icon.png",
+      "category": "Science"
     },
     "nsis": {
       "oneClick": false,
