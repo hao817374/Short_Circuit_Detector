@@ -102,7 +102,7 @@ function App() {
   const [win1Index, setWin1Index] = usePersistentState('cfg_win1Index', 25);
   const [win2Index, setWin2Index] = usePersistentState('cfg_win2Index', 75);
   const [globalOffset, setGlobalOffset] = usePersistentState('cfg_globalOffset', 160);
-  const [threshold, setThreshold] = usePersistentState('cfg_threshold', 50);
+  const [threshold, setThreshold] = usePersistentState('cfg_threshold', 50); //短路阈值默认值
 
   // Advanced Settings Persistence
   const [thresholdMin, setThresholdMin] = usePersistentState('cfg_thresholdMin', 5);
@@ -113,24 +113,13 @@ function App() {
   const [win2Offset, setWin2Offset] = usePersistentState('cfg_win2Offset', 0);
   const [probeThreshold, setProbeThreshold] = usePersistentState('cfg_probeThreshold', -4300);
 
+  // Device identity for auto-connect filtering (VID/PID learned on first connection)
+  const [deviceVid, setDeviceVid] = usePersistentState<number | null>('cfg_deviceVid', null);
+  const [devicePid, setDevicePid] = usePersistentState<number | null>('cfg_devicePid', null);
+
   const [calibMatrix, setCalibMatrix] = usePersistentState<[number, number, number, number]>('cfg_calibMatrix', [1, 0, 0, 1]);
   const [balanceFactor, setBalanceFactor] = usePersistentState('cfg_balanceFactor', 1.0);
-  // We don't necessarily need to persist compAxis separate from matrix logic, but keeping state consistent
   const [compAxis, setCompAxis] = useState<'Q0' | 'Q1' | 'NONE'>('NONE');
-
-  // 版本迁移：校准矩阵公式在 v1.0.8 变更，旧版本存储的矩阵需作废
-  const CALIB_MATRIX_VERSION = 2;
-  const [calibMatrixVersion, setCalibMatrixVersion] = usePersistentState('cfg_calibMatrixVersion', 0);
-  useEffect(() => {
-    if (calibMatrixVersion < CALIB_MATRIX_VERSION) {
-      setCalibMatrix([1, 0, 0, 1]);
-      setBalanceFactor(1.0);
-      setCompAxis('NONE');
-      setCalibRefVectors({ "NW": null, "SW": null });
-      setCalibMatrixVersion(CALIB_MATRIX_VERSION);
-      console.log('校准矩阵已迁移至 v' + CALIB_MATRIX_VERSION + '，旧校准数据已清除');
-    }
-  }, []);
 
   // --- Zero Calibration State (Lifted from DebugChart) ---
   const [isZeroSampling, setIsZeroSampling] = useState(false);
@@ -552,16 +541,56 @@ function App() {
     }
   };
 
+  // 从已知端口列表中找到 VID/PID 匹配的端口
+  const findMatchingPort = async (): Promise<SerialPort | null> => {
+    // @ts-ignore
+    const ports = await navigator.serial.getPorts().catch(() => []);
+    for (const p of ports) {
+      try {
+        // @ts-ignore - getInfo() is part of Web Serial API spec
+        const info = p.getInfo();
+        if (info?.usbVendorId && info?.usbProductId
+          && deviceVid !== null && devicePid !== null
+          && info.usbVendorId === deviceVid
+          && info.usbProductId === devicePid) {
+          return p;
+        }
+      } catch (e) { /* getInfo not supported on this platform */ }
+    }
+    return null;
+  };
+
+  // 连接成功后自动学习设备 VID/PID
+  const learnDeviceIdentity = async (p: SerialPort) => {
+    try {
+      // @ts-ignore - getInfo() is part of Web Serial API spec
+      const info = p.getInfo();
+      if (info?.usbVendorId && info?.usbProductId) {
+        setDeviceVid(info.usbVendorId);
+        setDevicePid(info.usbProductId);
+        console.log(`Device VID/PID learned: ${info.usbVendorId.toString(16)}:${info.usbProductId.toString(16)}`);
+      }
+    } catch (e) { /* getInfo not supported */ }
+  };
+
   const connectToPort = async () => {
     if (connected) return;
     setConnectionError(null);
     try {
-      // Clean up previous state first
       await disconnectSerial();
 
+      // 先检查已知端口中有无 VID/PID 匹配的设备（免弹窗）
+      const matchedPort = await findMatchingPort();
+      if (matchedPort) {
+        console.log("Connecting to matched device silently...");
+        await setupPort(matchedPort);
+        await learnDeviceIdentity(matchedPort);
+        return;
+      }
+
+      // 无匹配端口，弹出原生端口选择对话框
       // @ts-ignore
       const p = await navigator.serial.requestPort().catch((err: any) => {
-        // Ignore AbortError (user cancelled) or NotFoundError
         console.log("Port selection skipped/cancelled:", err.message);
         if (!err.message?.includes('cancelled')) {
           setConnectionError(language === 'zh'
@@ -573,6 +602,7 @@ function App() {
 
       if (p) {
         await setupPort(p);
+        await learnDeviceIdentity(p);
       }
     } catch (err) {
       console.error("Connection Error:", err);
@@ -684,11 +714,12 @@ function App() {
     const tryAutoConnect = async () => {
       if (portRef.current) return; // Already connected
       try {
-        // @ts-ignore
-        const ports = await navigator.serial.getPorts();
-        if (ports.length > 0) {
-          console.log("Auto-connecting to known port...");
-          setupPort(ports[0]);
+        // Electron 桌面环境中串口枚举可能延迟，等待 500ms 后再尝试
+        await new Promise(r => setTimeout(r, 500));
+        const matchedPort = await findMatchingPort();
+        if (matchedPort) {
+          console.log("Auto-connecting to known device...");
+          await setupPort(matchedPort);
         }
       } catch (e) {
         console.log("Auto-connect failed:", e);

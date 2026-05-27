@@ -2,6 +2,7 @@
 node_modules/
 npm_cache/
 skills/
+docs/
 
 # Build outputs
 dist/

@@ -23,3 +23,22 @@
     - 返回按钮置顶（`self-start`）。
     - 暂停按钮左侧显示 Q0 实时数值、右侧显示 Q1 实时数值。
     - 零点校准数值框格式与空间校准界面统一（Q0:/Q1:/BIAS: 格式 + 失败显示 NULL）。
+
+- **串口连接 VID/PID 自动学习过滤**:
+    - 首次连接成功后自动调用 `port.getInfo()` 获取硬件 USB VID/PID，存入 localStorage。
+    - 后续启动时 `getPorts()` 返回的端口列表中只匹配 VID/PID 一致的设备，不干扰其他串口。
+    - 换 USB 口：VID/PID 不变，静默连接；芯片更换：无匹配，回退弹窗重选后自动更新存储。
+    - `connectToPort`（欢迎页/顶栏连接按钮）先尝试匹配端口，无匹配时才弹出原生端口选择对话框。
+
+- **代码清理**:
+    - 移除校准矩阵版本迁移逻辑（`CALIB_MATRIX_VERSION` / `calibMatrixVersion`），矩阵公式为底层算法不需版本对比。
+    - 清理冗余注释和 dead code。
+
+- **文档补充**:
+    - 新增 `docs/欢迎界面处理流程.md`：启动决策、连接流程（VID/PID 过滤）、isConnecting 遮罩、错误处理、状态变量。
+    - 新增 `docs/方位检测处理流程.md`：commitFrame 六阶段管线、4 种 Compass 模式、DEFAULT_MAP 方向映射、最短旋转路径插值。
+    - 新增 `docs/空间校准处理流程.md`：零校准/方向校准完整流程、Cramer 法则矩阵求解推导、"确认并应用"按钮逻辑。
+    - 新增 `docs/系统配置处理流程.md`：Props 列表、本地缓冲模式、阈值关系、开发者模式入口。
+    - 新增 `docs/调试分析处理流程.md`：3 列布局、三圆盘、DSP 窗口拖拽、暂停机制、与空间校准对比。
+    - 更新 `CLAUDE.md`：补充 `stateRef.samplingStep`、`zeroCalibEverRun`、自适应阈值、DebugChart 新布局等。
+    - 新增 `docs/短路测试仪架构流程图.drawio`：顶层的 5 分支架构总图。
