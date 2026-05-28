@@ -2,12 +2,12 @@
 import React, { useState, useEffect, useRef, useMemo } from 'react';
 import { Compass } from './components/Compass';
 import { DebugChart } from './components/DebugChart';
-import { MultiFrameChart } from './components/MultiFrameChart';
+
 import { Settings } from './components/Settings';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CalibrationView } from './components/CalibrationView';
 import { CompassData, SerialPort, DebugPoint, Language, ThemeMode } from './types';
-import { Usb, PlugZap, Activity, BarChart2, Layers, Crosshair, CheckCircle2, ChevronRight, Timer, AlertCircle, Eye, Zap, Waves, Signal, Scale, Compass as CompassIcon, Navigation, Settings2, Trash2, Target, Move } from 'lucide-react';
+import { Usb, PlugZap, Timer, AlertCircle } from 'lucide-react';
 
 type ViewMode = 'COMPASS' | 'CALIBRATION' | 'DEBUG' | 'SETTINGS';
 
@@ -157,7 +157,6 @@ function App() {
     };
   }, [win1Index, win2Index, globalOffset, win1Offset, win2Offset, calibMatrix, probeThreshold, isZeroSampling, samplingStep]);
 
-  const [isCalibrating2P, setIsCalibrating2P] = useState(false);
   const [calibRefVectors, setCalibRefVectors] = useState<Record<string, { q0: number, q1: number } | null>>({ "NW": null, "SW": null });
   const [spatialCalibStatus, setSpatialCalibStatus] = useState<Record<string, 'IDLE' | 'SUCCESS' | 'FAILED'>>({ "NW": 'IDLE', "SW": 'IDLE' });
   const [sampleProgress, setSampleProgress] = useState(0);
@@ -423,7 +422,6 @@ function App() {
     // 灵敏度比值 K
     setBalanceFactor(Number((Math.max(mag1, mag2) / Math.min(mag1, mag2)).toFixed(4)));
     setCompAxis(mag1 < mag2 ? 'Q0' : 'Q1');
-    setIsCalibrating2P(false);
   };
 
   const resetCalibration = () => {
@@ -435,14 +433,6 @@ function App() {
     setZeroCalibResult(null);
     setZeroCalibEverRun(false);
     setZeroCalibStatus('IDLE');
-  };
-
-  const handleConfirmAndExit = () => {
-    if (allCalibrated) {
-      finishCalibration();
-    } else {
-      setIsCalibrating2P(false);
-    }
   };
 
   const handleCalibConfirm = () => {
@@ -772,26 +762,6 @@ function App() {
     nav_settings: language === 'zh' ? "系统配置" : "SETTINGS",
   };
 
-  // Calibration Modal Texts
-  const t_calib = {
-    title: language === 'zh' ? "校准" : "CALIBRATION",
-    subtitle: "", // Removed per request
-    zeroTitle: language === 'zh' ? "零点校准" : "ZERO CALIBRATION",
-    zeroInstruction: language === 'zh' ? "将表笔短接后，点击下方按钮" : "Short the probes, then click the button below",
-    dirTitle: language === 'zh' ? "方向校准" : "DIRECTION CALIBRATION",
-    btn1: language === 'zh' ? "右下角激励源" : "Bottom-Right",
-    btn2: language === 'zh' ? "右上角激励源" : "Top-Right",
-    sampling: language === 'zh' ? "采样中..." : "Sampling...",
-    captured: language === 'zh' ? "已捕获" : "Vector Captured",
-    resolved: language === 'zh' ? "校准矩阵" : "Resolved Matrix",
-    clear: language === 'zh' ? "清除校准" : "CLEAR",
-    cancel: language === 'zh' ? "取消" : "CANCEL",
-    confirm: language === 'zh' ? "确认并应用" : "CONFIRM & APPLY",
-    waveTip: language === 'zh' ? "等待波形稳定后 点击左侧对应按键" : "Wait for stable waveform, then click button",
-    calibSuccess: language === 'zh' ? "校准成功" : "CALIBRATION SUCCESSFUL",
-    calibFailed: language === 'zh' ? "校准失败" : "CALIBRATION FAILED"
-  };
-
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-slate-800 dark:text-slate-200 font-sans flex flex-col overflow-hidden transition-colors duration-300">
       {isConnecting && (
@@ -806,113 +776,6 @@ function App() {
           <button onClick={disconnectSerial} className="mt-6 px-8 py-2.5 bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-400 text-[10px] font-black tracking-widest rounded-xl border border-slate-300 dark:border-white/10 hover:bg-slate-300 dark:hover:bg-white/10 transition-all">
             {language === 'zh' ? '取消' : 'CANCEL'}
           </button>
-        </div>
-      )}
-
-      {isCalibrating2P && (
-        <div className="fixed inset-0 z-[200] flex items-center justify-center bg-slate-100/90 dark:bg-slate-950/95 p-6 animate-in fade-in duration-500 transition-colors">
-          <div className="w-full max-w-6xl h-full max-h-[720px] bg-slate-50 dark:bg-slate-900/40 border border-slate-300 dark:border-white/10 rounded-[3rem] shadow-2xl flex flex-col lg:flex-row overflow-hidden transition-colors">
-            <div className="flex-1 p-10 flex flex-col justify-between border-r border-slate-300 dark:border-white/5 relative z-10 transition-colors">
-              <div className="flex-1 flex flex-col gap-8 overflow-y-auto">
-                <div className="flex items-center gap-5">
-                  <div className="w-14 h-14 rounded-2xl bg-cyan-600/10 dark:bg-cyan-600/20 flex items-center justify-center border border-cyan-500/30"><Scale className="text-cyan-600 dark:text-cyan-400" size={28} /></div>
-                  <div>
-                    <h2 className="text-2xl font-black text-slate-900 dark:text-white uppercase tracking-tight transition-colors">{t_calib.title}</h2>
-                  </div>
-                </div>
-
-                {/* Top Section: Zero Calibration */}
-                <div className="bg-white/80 dark:bg-slate-950/40 rounded-[2rem] p-6 border border-slate-300 dark:border-white/5 flex flex-col gap-4 shadow-sm transition-colors">
-                  <h3 className="text-sm font-black text-slate-600 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2 transition-colors">
-                    <Target size={14} className="text-cyan-600 dark:text-cyan-500" /> {t_calib.zeroTitle}
-                  </h3>
-                  <p className="text-xs text-slate-500 dark:text-slate-400 font-mono tracking-wide transition-colors">{t_calib.zeroInstruction}</p>
-                  <div className="flex items-center gap-4">
-                    <button
-                      onClick={handleZeroCalibrate}
-                      disabled={isZeroSampling}
-                      className={`flex-1 py-4 rounded-2xl border flex items-center justify-center gap-2 transition-all font-black text-[10px] tracking-widest uppercase ${isZeroSampling ? 'bg-cyan-100 dark:bg-cyan-500/20 border-cyan-500 text-cyan-600 dark:text-cyan-400' : 'bg-slate-50 dark:bg-slate-800 border-slate-300 dark:border-white/5 hover:bg-slate-100 dark:hover:bg-slate-700 text-slate-700 dark:text-slate-300'}`}
-                    >
-                      {isZeroSampling ? <Timer size={16} className="animate-spin" /> : <Target size={16} />}
-                      {isZeroSampling ? t_calib.sampling : t_calib.zeroTitle}
-                    </button>
-
-                    <div className="flex flex-col items-center bg-slate-100 dark:bg-black/20 px-4 py-2 rounded-xl border border-slate-300 dark:border-white/5 min-w-[80px] transition-colors">
-                      <span className="text-[9px] text-slate-500 font-bold">BIAS</span>
-                      <span className="text-lg font-mono font-bold text-cyan-600 dark:text-cyan-400">{globalOffset}</span>
-                    </div>
-                  </div>
-                  {zeroCalibStatus !== 'IDLE' && (
-                    <div className={`w-full py-2 rounded-xl flex items-center justify-center gap-2 text-[10px] font-black uppercase tracking-widest ${zeroCalibStatus === 'SUCCESS' ? 'bg-emerald-100 dark:bg-emerald-500/10 text-emerald-600 dark:text-emerald-500' : 'bg-red-100 dark:bg-red-500/10 text-red-600 dark:text-red-500'}`}>
-                      {zeroCalibStatus === 'SUCCESS' ? <CheckCircle2 size={14} /> : <AlertCircle size={14} />}
-                      {zeroCalibStatus === 'SUCCESS' ? t_calib.calibSuccess : t_calib.calibFailed}
-                    </div>
-                  )}
-                </div>
-
-                {/* Bottom Section: Direction Calibration */}
-                <div className="bg-white/80 dark:bg-slate-950/40 rounded-[2rem] p-6 border border-slate-300 dark:border-white/5 flex flex-col gap-4 flex-1 shadow-sm transition-colors">
-                  <h3 className="text-sm font-black text-slate-600 dark:text-slate-500 uppercase tracking-widest flex items-center gap-2 transition-colors">
-                    <Move size={14} className="text-amber-500" /> {t_calib.dirTitle}
-                  </h3>
-                  <div className="flex flex-col gap-4 flex-1">
-                    {["SW", "NW"].map((step) => {
-                      const label = step === "SW" ? t_calib.btn1 : t_calib.btn2;
-                      const val = calibRefVectors[step];
-                      const isSampling = samplingStep === step;
-                      return (
-                        <button key={step} disabled={samplingStep !== null} onClick={() => startSampling(step)} className={`flex-1 relative overflow-hidden rounded-2xl border flex flex-col items-center justify-center p-4 transition-all ${isSampling ? 'bg-cyan-100 dark:bg-cyan-500/20 border-cyan-500 scale-[1.02] shadow-xl' : 'bg-slate-50 dark:bg-slate-950/50 border-slate-300 dark:border-white/5 hover:border-slate-400 dark:hover:border-white/20 hover:bg-slate-100 dark:hover:bg-slate-900'} ${val !== null ? 'border-emerald-500/60 bg-emerald-50 dark:bg-emerald-500/10' : ''}`}>
-                          {val !== null ? (
-                            <div className="flex flex-col items-center relative z-10">
-                              <span className="text-sm font-black text-emerald-600 dark:text-emerald-400 font-mono transition-colors">Q0:{val.q0.toFixed(0)} Q1:{val.q1.toFixed(0)}</span>
-                              <span className="text-[8px] font-black text-emerald-600 dark:text-emerald-600 uppercase mt-1 tracking-widest transition-colors">{t_calib.captured}</span>
-                            </div>
-                          ) : isSampling ? (
-                            <div className="flex flex-col items-center relative z-10">
-                              <Timer size={24} className="text-cyan-600 dark:text-cyan-400 animate-spin mb-1 transition-colors" />
-                              <span className="text-[9px] font-black text-cyan-600 dark:text-cyan-400 uppercase tracking-widest transition-colors">{t_calib.sampling}</span>
-                            </div>
-                          ) : (
-                            <div className="flex flex-col items-center relative z-10">
-                              <span className="text-sm font-black text-slate-700 dark:text-slate-300 uppercase tracking-widest text-center leading-relaxed transition-colors">{label}</span>
-                            </div>
-                          )}
-                          {isSampling && <div className="absolute bottom-0 left-0 h-1 bg-cyan-500 transition-all duration-200" style={{ width: `${sampleProgress}%` }}></div>}
-                        </button>
-                      );
-                    })}
-                  </div>
-                </div>
-              </div>
-
-              <div className="flex gap-4 mt-8 pt-6 border-t border-slate-300 dark:border-white/5 transition-colors">
-                <button onClick={resetCalibration} className="flex-1 py-4 rounded-2xl bg-red-100 dark:bg-red-500/10 border border-red-500/20 text-red-600 dark:text-red-400 font-black hover:bg-red-200 dark:hover:bg-red-500/20 text-[10px] uppercase tracking-widest flex items-center justify-center gap-2 transition-colors">
-                  <Trash2 size={14} /> {t_calib.clear}
-                </button>
-                <button onClick={() => setIsCalibrating2P(false)} className="flex-1 py-4 rounded-2xl bg-slate-200 dark:bg-white/5 text-slate-600 dark:text-slate-500 font-black hover:bg-slate-300 dark:hover:bg-white/10 text-[10px] uppercase tracking-widest transition-colors">{t_calib.cancel}</button>
-                <button onClick={handleConfirmAndExit} disabled={!allCalibrated && !isCleared} className={`flex-[2] py-4 rounded-2xl font-black transition-all flex items-center justify-center gap-2 uppercase text-[10px] tracking-widest ${allCalibrated || isCleared ? 'bg-cyan-600 hover:bg-cyan-500 text-white shadow-xl' : 'bg-slate-200 dark:bg-slate-800 text-slate-400 dark:text-slate-600'}`}>{t_calib.confirm}</button>
-              </div>
-            </div>
-            <div className="hidden lg:flex flex-1 bg-slate-200/50 dark:bg-black/40 p-10 flex-col overflow-hidden transition-colors">
-              <div className="flex-grow rounded-[3rem] border border-slate-300 dark:border-white/10 bg-white dark:bg-slate-950 overflow-hidden relative shadow-inner flex flex-col transition-colors">
-                {debugData.length === 0 ? (
-                  <div className="flex-grow h-full flex flex-col items-center justify-center text-slate-300 dark:text-slate-800 font-mono gap-5 transition-colors"><Signal className="animate-pulse" size={80} /></div>
-                ) : (
-                  <div className="flex-grow h-full relative p-12 flex flex-col">
-                    <div className="text-center mb-4">
-                      <h3 className="text-2xl font-black text-cyan-600 dark:text-cyan-400 animate-pulse tracking-wide uppercase drop-shadow-[0_0_10px_rgba(34,211,238,0.3)] dark:drop-shadow-[0_0_10px_rgba(34,211,238,0.5)] transition-colors">
-                        {t_calib.waveTip}
-                      </h3>
-                    </div>
-                    <svg className="w-full h-full overflow-visible" viewBox="0 0 103 100" preserveAspectRatio="none">
-                      <line x1="0" y1="50" x2="103" y2="50" stroke="currentColor" className="text-slate-300 dark:text-white/10 transition-colors" strokeWidth="0.5" />
-                      <polyline fill="none" stroke="#22d3ee" strokeWidth="2" strokeLinecap="round" strokeLinejoin="round" points={debugData.map((p, i) => `${i},${100 - ((p.value + globalOffset - previewBounds.min) / previewBounds.range) * 100}`).join(' ')} className="drop-shadow-sm dark:drop-shadow-[0_0_8px_rgba(34,211,238,0.5)]" />
-                    </svg>
-                  </div>
-                )}
-              </div>
-            </div>
-          </div>
         </div>
       )}
 

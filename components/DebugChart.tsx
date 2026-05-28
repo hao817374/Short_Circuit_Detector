@@ -2,8 +2,8 @@
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DebugPoint, Language } from '../types';
 import { getWindowAvg } from '../utils/dsp';
-import { 
-  Settings2, Pause, Play, GripHorizontal, 
+import {
+  Pause, Play, GripHorizontal,
   ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
   Zap, Navigation, Target, AlertCircle, CheckCircle2, Loader2, ArrowLeft as BackIcon
 } from 'lucide-react';
@@ -44,14 +44,14 @@ interface DebugChartProps {
 const POINTS_PER_FRAME = 103;
 
 const DIRECTION_UI_INFO = [
-    { heading: 0, label: "NORTH", Icon: ArrowUp },
-    { heading: 45, label: "NE", Icon: ArrowUpRight },
-    { heading: 90, label: "EAST", Icon: ArrowRight },
-    { heading: 135, label: "SE", Icon: ArrowDownRight },
-    { heading: 180, label: "SOUTH", Icon: ArrowDown },
-    { heading: 225, label: "SW", Icon: ArrowDownLeft },
-    { heading: 270, label: "WEST", Icon: ArrowLeft },
-    { heading: 315, label: "NW", Icon: ArrowUpLeft },
+    { heading: 0, label: "NORTH", zhLabel: "北", Icon: ArrowUp },
+    { heading: 45, label: "NE", zhLabel: "东北", Icon: ArrowUpRight },
+    { heading: 90, label: "EAST", zhLabel: "东", Icon: ArrowRight },
+    { heading: 135, label: "SE", zhLabel: "东南", Icon: ArrowDownRight },
+    { heading: 180, label: "SOUTH", zhLabel: "南", Icon: ArrowDown },
+    { heading: 225, label: "SW", zhLabel: "西南", Icon: ArrowDownLeft },
+    { heading: 270, label: "WEST", zhLabel: "西", Icon: ArrowLeft },
+    { heading: 315, label: "NW", zhLabel: "西北", Icon: ArrowUpLeft },
 ];
 
 export const DebugChart: React.FC<DebugChartProps> = ({ 
@@ -140,7 +140,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
   const directionInfo = useMemo(() => {
     const uiInfo = DIRECTION_UI_INFO.find(u => u.heading === calibratedHeading) || DIRECTION_UI_INFO[0];
     const iconProps = { size: 48, strokeWidth: 2.5, className: "text-cyan-400 drop-shadow-[0_0_15px_rgba(34,211,238,0.7)]" };
-    return { icon: data.length > 0 ? <uiInfo.Icon {...iconProps} /> : null, text: data.length > 0 ? uiInfo.label : "--" };
+    return { icon: data.length > 0 ? <uiInfo.Icon {...iconProps} /> : null, text: data.length > 0 ? (language === 'zh' ? uiInfo.zhLabel : uiInfo.label) : "--" };
   }, [calibratedHeading, data.length]);
 
   const svgRef = useRef<SVGSVGElement>(null);

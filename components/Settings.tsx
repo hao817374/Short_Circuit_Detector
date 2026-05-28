@@ -1,6 +1,6 @@
 
 import React, { useState, useEffect } from 'react';
-import { Settings2, Sliders, RotateCcw, Gauge, Zap, Target, ArrowLeftRight, Scale, AlertTriangle, Save, Check, Sun, Moon, Activity, AlertCircle } from 'lucide-react';
+import { Settings2, Sliders, RotateCcw, AlertTriangle, Save, Check, Sun, Moon, Activity, AlertCircle } from 'lucide-react';
 import { Language, ThemeMode } from '../types';
 
 interface SettingsProps {

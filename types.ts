@@ -41,15 +41,3 @@ export interface SerialOptions {
   bufferSize?: number;
   flowControl?: 'none' | 'hardware';
 }
-
-export enum ViewState {
-  DASHBOARD = 'DASHBOARD',
-  ANALYZER = 'ANALYZER',
-  SETTINGS = 'SETTINGS',
-}
-
-export interface AnalysisResult {
-  suggestion: string;
-  complexity: string;
-  technologies: string[];
-}
