@@ -1,7 +1,7 @@
 import { DebugPoint } from '../types';
 
 // 窗口化修剪均值算法的核心参数
-export const WINDOW_SIZE = 32;         // 采样窗口：从 103 点帧中取 32 个连续点
+export const WINDOW_SIZE = 32;         // 采样窗口：从 POINTS_PER_FRAME 点帧中取 32 个连续点
 export const TRIM_COUNT = 6;            // 修剪数量：两端各剔除 6 个极值点（6/32 = 18.75%）
 export const WINDOW_CENTER_OFFSET = Math.floor(WINDOW_SIZE / 2); // 窗口中心偏移（16 点）
 

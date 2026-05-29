@@ -2,6 +2,9 @@
 export type Language = 'en' | 'zh';
 export type ThemeMode = 'dark' | 'light';
 
+// 每帧数据点数量
+export const POINTS_PER_FRAME = 100;
+
 export interface CompassData {
   q0: number;
   q1: number;

@@ -1,6 +1,6 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
-import { DebugPoint, Language } from '../types';
+import { DebugPoint, Language, POINTS_PER_FRAME } from '../types';
 import { getWindowAvg } from '../utils/dsp';
 import {
   Pause, Play, GripHorizontal,
@@ -40,8 +40,6 @@ interface DebugChartProps {
   onBack: () => void;
   language: Language;
 }
-
-const POINTS_PER_FRAME = 103;
 
 const DIRECTION_UI_INFO = [
     { heading: 0, label: "NORTH", zhLabel: "北", Icon: ArrowUp },

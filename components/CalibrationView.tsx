@@ -1,5 +1,5 @@
 import React, { useEffect, useRef } from 'react';
-import { Language, DebugPoint } from '../types';
+import { Language, DebugPoint, POINTS_PER_FRAME } from '../types';
 import { CheckCircle2, Crosshair, Zap, Navigation, Scale, Signal, Trash2 } from 'lucide-react';
 
 interface CalibrationViewProps {
@@ -183,8 +183,8 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({
                 <div className="text-center mb-8">
                   <h3 className="text-xl font-black text-cyan-600 dark:text-cyan-400 animate-pulse tracking-wide uppercase">{t.waveTip}</h3>
                 </div>
-                <svg className="w-full h-full overflow-visible" viewBox="0 0 103 100" preserveAspectRatio="none">
-                  <line x1="0" y1="50" x2="103" y2="50" stroke="currentColor" className="text-slate-300 dark:text-white/10 transition-colors" strokeWidth="0.5" />
+                <svg className="w-full h-full overflow-visible" viewBox={`0 0 ${POINTS_PER_FRAME} 100`} preserveAspectRatio="none">
+                  <line x1="0" y1="50" x2={POINTS_PER_FRAME} y2="50" stroke="currentColor" className="text-slate-300 dark:text-white/10 transition-colors" strokeWidth="0.5" />
                   <polyline fill="none" stroke="#22d3ee" strokeWidth="1.5" strokeLinecap="round" strokeLinejoin="round" points={debugData.map((p, i) => `${i},${100 - ((p.value + globalOffset - previewBounds.min) / previewBounds.range) * 100}`).join(' ')} className="drop-shadow-sm dark:drop-shadow-[0_0_8px_rgba(34,211,238,0.3)]" />
                 </svg>
               </div>

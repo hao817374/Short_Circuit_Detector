@@ -6,14 +6,12 @@ import { DebugChart } from './components/DebugChart';
 import { Settings } from './components/Settings';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CalibrationView } from './components/CalibrationView';
-import { CompassData, SerialPort, DebugPoint, Language, ThemeMode } from './types';
+import { CompassData, SerialPort, DebugPoint, Language, ThemeMode, POINTS_PER_FRAME } from './types';
 import { Usb, PlugZap, Timer, AlertCircle } from 'lucide-react';
 
 type ViewMode = 'COMPASS' | 'CALIBRATION' | 'DEBUG' | 'SETTINGS';
 
 import { getWindowAvg, WINDOW_SIZE, WINDOW_CENTER_OFFSET } from './utils/dsp';
-
-const POINTS_PER_FRAME = 103;
 
 /**
  * 方向映射查找表：atan2(ref) → 罗盘 heading
@@ -173,7 +171,7 @@ function App() {
 
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
 
-  // 帧提交：串口数据管线核心，每 103 点触发一次
+  // 帧提交：串口数据管线核心，每 POINTS_PER_FRAME 点触发一次
   const commitFrame = () => {
     if (tempDebugBuffer.current.length >= POINTS_PER_FRAME) {
       const newFrame = tempDebugBuffer.current.slice(0, POINTS_PER_FRAME);
@@ -449,7 +447,7 @@ function App() {
 
   /**
    * 串口读取主循环：TextDecoderStream 解码 → 按行拆分 → 4 字段解析 → 帧提交
-   * 硬件每行输出 "index value flag1 flag2"，每 103 行以 "next" 标记帧结束
+   * 硬件每行输出 "index value flag1 flag2"，每 POINTS_PER_FRAME 行以 "next" 标记帧结束
    */
   const readLoop = async (currentPort: SerialPort) => {
     let reader;
