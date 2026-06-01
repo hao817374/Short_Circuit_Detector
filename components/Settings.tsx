@@ -31,6 +31,9 @@ interface SettingsProps {
   isDeveloperMode: boolean;
   setIsDeveloperMode: (v: boolean) => void;
 
+  isEncryptedMode: boolean;
+  setIsEncryptedMode: (v: boolean) => void;
+
   onClose: () => void;
   onEnterDevMode: () => void;
 }
@@ -47,6 +50,7 @@ export const Settings: React.FC<SettingsProps> = ({
   win2Offset, setWin2Offset,
   probeThreshold, setProbeThreshold,
   isDeveloperMode, setIsDeveloperMode,
+  isEncryptedMode, setIsEncryptedMode,
   onClose, onEnterDevMode
 }) => {
   const [showDevWarning, setShowDevWarning] = useState(false);
@@ -318,6 +322,28 @@ export const Settings: React.FC<SettingsProps> = ({
                         onChange={(e) => setLocalProbeThreshold(Number(e.target.value))}
                         className="w-32 px-4 py-2 rounded-xl bg-white dark:bg-slate-950 border border-slate-300 dark:border-white/10 font-mono text-sm font-bold text-red-500 dark:text-red-400 text-center focus:outline-none focus:ring-2 focus:ring-red-500/50 transition-all"
                     />
+                </div>
+            </div>
+
+            {/* 加密模式开关 */}
+            <div className="mb-6">
+                <div className="bg-slate-50 dark:bg-black/20 p-6 rounded-3xl border border-slate-200 dark:border-white/5">
+                    <div className="flex items-center justify-between">
+                        <div>
+                            <label className="text-xs font-black text-slate-400 uppercase tracking-widest">
+                                {language === 'zh' ? '数据加密模式' : 'ENCRYPTED MODE'}
+                            </label>
+                            <p className="text-[10px] text-slate-400 dark:text-slate-500 mt-1 leading-relaxed">
+                                {language === 'zh' ? '接收 ChaCha20 加密二进制帧（需重新连接生效）' : 'Receive ChaCha20 encrypted binary frames (requires reconnect)'}
+                            </p>
+                        </div>
+                        <button
+                            onClick={() => setIsEncryptedMode(!isEncryptedMode)}
+                            className={`relative w-14 h-7 rounded-full transition-colors duration-200 ${isEncryptedMode ? 'bg-cyan-600' : 'bg-slate-300 dark:bg-slate-700'}`}
+                        >
+                            <div className={`absolute top-0.5 w-6 h-6 bg-white rounded-full shadow transition-transform duration-200 ${isEncryptedMode ? 'translate-x-7' : 'translate-x-0.5'}`} />
+                        </button>
+                    </div>
                 </div>
             </div>
 

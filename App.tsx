@@ -7,6 +7,7 @@ import { Settings } from './components/Settings';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CalibrationView } from './components/CalibrationView';
 import { CompassData, SerialPort, DebugPoint, Language, ThemeMode, POINTS_PER_FRAME } from './types';
+import { scanFrame } from './utils/binaryProtocol';
 import { Usb, PlugZap, Timer, AlertCircle } from 'lucide-react';
 
 type ViewMode = 'COMPASS' | 'CALIBRATION' | 'DEBUG' | 'SETTINGS';
@@ -61,6 +62,7 @@ function App() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [skipWelcome, setSkipWelcome] = usePersistentState('cfg_skipWelcome', false);
   const [isDeveloperMode, setIsDeveloperMode] = usePersistentState('cfg_isDevMode', false);
+  const [isEncryptedMode, setIsEncryptedMode] = usePersistentState('cfg_encryptedMode', false);
 
   // Auto-dismiss connection errors after 6 seconds
   useEffect(() => {
@@ -528,6 +530,66 @@ function App() {
     }
   };
 
+  // 加密二进制协议 readLoop：读取原始字节 → 帧同步 → 解密 → DebugPoint[]
+  const readLoopBinary = async (currentPort: SerialPort) => {
+    let reader;
+    try {
+      if (!currentPort.readable) throw new Error("Port not readable");
+      reader = currentPort.readable.getReader();
+      readerRef.current = reader;
+    } catch (e) {
+      console.error("Failed to get reader:", e);
+      disconnectSerial();
+      return;
+    }
+
+    let byteBuffer = new Uint8Array(0);
+
+    try {
+      while (keepReadingRef.current) {
+        const { value, done } = await reader.read();
+        if (done) break;
+        if (value && value.length > 0) {
+          // 追加到缓冲区
+          const merged = new Uint8Array(byteBuffer.length + value.length);
+          merged.set(byteBuffer);
+          merged.set(value, byteBuffer.length);
+          byteBuffer = merged;
+
+          // 扫描并解析完整帧
+          while (byteBuffer.length >= 206) {
+            const result = scanFrame(byteBuffer);
+            if (result) {
+              if (!hasValidDataRef.current) {
+                hasValidDataRef.current = true;
+                setIsConnecting(false);
+              }
+              tempDebugBuffer.current = result.points;
+              commitFrame();
+              byteBuffer = byteBuffer.slice(result.consumed);
+            } else {
+              // 未找到有效帧，寻找下一个 0xAA
+              const nextAA = byteBuffer.indexOf(0xAA, 1);
+              if (nextAA === -1) {
+                byteBuffer = new Uint8Array(0);
+              } else {
+                byteBuffer = byteBuffer.slice(nextAA);
+              }
+              break;
+            }
+          }
+        }
+      }
+    } catch (e) {
+      console.error("Read Loop Error:", e);
+    } finally {
+      console.log("Releasing reader lock");
+      try { await reader.cancel(); } catch (e) {}
+      try { reader.releaseLock(); } catch (e) {}
+      if (keepReadingRef.current) disconnectSerial();
+    }
+  };
+
   // 从已知端口列表中找到 VID/PID 匹配的端口
   const findMatchingPort = async (): Promise<SerialPort | null> => {
     // @ts-ignore
@@ -665,7 +727,7 @@ function App() {
     keepReadingRef.current = true;
     hasValidDataRef.current = false;
 
-    readLoopPromiseRef.current = readLoop(p);
+    readLoopPromiseRef.current = isEncryptedMode ? readLoopBinary(p) : readLoop(p);
     console.log("Port connected successfully");
 
     // Timeout Check for Valid Data Formatting
@@ -919,6 +981,8 @@ function App() {
               onEnterDevMode={() => setViewMode('DEBUG')}
               isDeveloperMode={isDeveloperMode}
               setIsDeveloperMode={setIsDeveloperMode}
+              isEncryptedMode={isEncryptedMode}
+              setIsEncryptedMode={setIsEncryptedMode}
             />
           </div>
         )}
