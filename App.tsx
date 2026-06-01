@@ -658,14 +658,90 @@ function App() {
     for (let i = 0; i < 10; i++) checksum += handshake[i];
     handshake[10] = checksum & 0xFF; // 校验和
     try {
-      const writer = p.writable?.getWriter();
-      if (writer) {
+      if (!p.writable) {
+        console.error("Port writable is null — handshake NOT sent. Check port open permissions.");
+      } else {
+        const writer = p.writable.getWriter();
         await writer.write(handshake);
         writer.releaseLock();
         console.log("Handshake sent, session ID:", Array.from(sessionId).map(b => b.toString(16).padStart(2, '0')).join(' '));
       }
     } catch (e) {
-      console.warn("Failed to send handshake:", e);
+      console.error("Failed to send handshake:", e);
+    }
+
+    // 等待 MCU 应答帧（最多重试 3 次）
+    if (p.readable) {
+      let ackReceived = false;
+      for (let attempt = 0; attempt < 3 && !ackReceived; attempt++) {
+        if (attempt > 0) {
+          // 重发握手包
+          console.log(`Handshake retry ${attempt + 1}/3...`);
+          try {
+            const writer = p.writable?.getWriter();
+            if (writer) { await writer.write(handshake); writer.releaseLock(); }
+          } catch (e) { /* ignore */ }
+        }
+        try {
+          const ackReader = p.readable.getReader();
+          let ackBuffer = new Uint8Array(0);
+          const deadline = Date.now() + 500;
+          while (Date.now() < deadline) {
+            // 超时控制：用 Promise.race 限制单次 read 等待时间
+            const readPromise = ackReader.read();
+            const timeoutPromise = new Promise<{ value?: Uint8Array; done?: boolean }>((resolve) =>
+              setTimeout(() => resolve({ value: undefined, done: false }), Math.max(1, deadline - Date.now()))
+            );
+            const { value, done } = await Promise.race([readPromise, timeoutPromise]);
+            if (done || !value) {
+              if (Date.now() >= deadline) break;
+              continue;
+            }
+            const merged = new Uint8Array(ackBuffer.length + value.length);
+            merged.set(ackBuffer);
+            merged.set(value, ackBuffer.length);
+            ackBuffer = merged;
+            // 扫描 ACK 帧: 55 02 [8B sessionId] [checksum]
+            while (ackBuffer.length >= 11) {
+              if (ackBuffer[0] !== 0x55 || ackBuffer[1] !== 0x02) {
+                const next55 = ackBuffer.indexOf(0x55, 1);
+                ackBuffer = next55 === -1 ? new Uint8Array(0) : ackBuffer.slice(next55);
+                if (ackBuffer.length < 11) break;
+                continue;
+              }
+              let ackChecksum = 0;
+              for (let i = 0; i < 10; i++) ackChecksum += ackBuffer[i];
+              if ((ackChecksum & 0xFF) !== ackBuffer[10]) {
+                ackBuffer = ackBuffer.slice(1); // 校验失败，跳过当前字节
+                continue;
+              }
+              const ackSid = ackBuffer.slice(2, 10);
+              let sidMatch = true;
+              for (let i = 0; i < 8; i++) {
+                if (ackSid[i] !== sessionId[i]) { sidMatch = false; break; }
+              }
+              if (sidMatch) {
+                ackReceived = true;
+                console.log("Handshake ACK received, session confirmed");
+                break;
+              }
+              ackBuffer = ackBuffer.slice(1); // ID 不匹配，跳过
+            }
+          }
+          try { ackReader.releaseLock(); } catch (e) {}
+        } catch (e) {
+          console.warn("ACK read attempt failed:", e);
+        }
+      }
+
+      if (!ackReceived) {
+        console.error("Handshake failed: no valid ACK after 3 attempts");
+        setConnectionError(language === 'zh'
+          ? "握手失败：未收到设备应答，请检查设备是否已正确烧录固件"
+          : "Handshake failed: no ACK from device. Check firmware.");
+        disconnectSerial();
+        return;
+      }
     }
 
     readLoopPromiseRef.current = readLoop(p);
