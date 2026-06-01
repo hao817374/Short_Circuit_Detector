@@ -64,18 +64,19 @@ const chacha20Block = (key: Uint8Array, counter: number, nonce: Uint8Array): Uin
   return out;
 };
 
-// 从 seq_num 派生 12 字节 Nonce: seq_num(4B LE) + 零填充(8B)
-const deriveNonce = (seqNum: number): Uint8Array => {
+// 从会话 ID + seq_num 派生 12 字节 Nonce: sessionId(8B) + seqNum(4B LE)
+const deriveNonce = (sessionId: Uint8Array, seqNum: number): Uint8Array => {
   const nonce = new Uint8Array(12);
-  u32ToLe(seqNum, nonce, 0);  // 前 4 字节 = seq_num 小端序，后 8 字节保持 0
+  nonce.set(sessionId, 0);        // 前 8 字节 = 会话 ID（连接时随机生成）
+  u32ToLe(seqNum, nonce, 8);      // 后 4 字节 = seq_num 小端序
   return nonce;
 };
 
 // 解密 200 字节加密载荷 → 返回 200 字节明文
 // ChaCha20 是流密码，加密与解密是同一操作（密钥流 XOR 密文）
-export const decryptPayload = (encrypted: Uint8Array, seqNum: number): Uint8Array => {
+export const decryptPayload = (encrypted: Uint8Array, seqNum: number, sessionId: Uint8Array): Uint8Array => {
   const plaintext = new Uint8Array(200);
-  const nonce = deriveNonce(seqNum);
+  const nonce = deriveNonce(sessionId, seqNum);
 
   // 200 字节需要 ceil(200/64) = 4 个密钥流块（最后一个块只用前 8 字节）
   for (let blockIdx = 0; blockIdx < 4; blockIdx++) {

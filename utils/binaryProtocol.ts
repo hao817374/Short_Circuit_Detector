@@ -27,14 +27,14 @@ const readI16LE = (b: Uint8Array, off: number): number => {
 };
 
 // 尝试解析二进制帧，成功返回 DebugPoint[]，失败返回 null（校验和不匹配）
-export const tryParseFrame = (frame: Uint8Array): DebugPoint[] | null => {
+export const tryParseFrame = (frame: Uint8Array, sessionId: Uint8Array): DebugPoint[] | null => {
   if (frame.length !== FRAME_SIZE) return null;
   if (frame[0] !== FRAME_HEADER) return null;
   if (frame[205] !== computeChecksum(frame)) return null;
 
   const seqNum = readU32LE(frame, 1);          // 字节 1-4：序列号
   const encrypted = frame.slice(5, 205);       // 字节 5-204：加密载荷
-  const plaintext = decryptPayload(encrypted, seqNum);
+  const plaintext = decryptPayload(encrypted, seqNum, sessionId);
 
   // 还原 100 个 int16 ADC 值 → DebugPoint[]
   const points: DebugPoint[] = [];
@@ -52,14 +52,14 @@ export const tryParseFrame = (frame: Uint8Array): DebugPoint[] | null => {
 // 从字节缓冲区扫描并提取第一个有效帧
 // 返回 { points, consumed } — consumed 是消耗的字节数（跳到帧尾后）
 // 如果没找到有效帧，返回 null（保留缓冲区等待更多数据）
-export const scanFrame = (buffer: Uint8Array): { points: DebugPoint[]; consumed: number } | null => {
+export const scanFrame = (buffer: Uint8Array, sessionId: Uint8Array): { points: DebugPoint[]; consumed: number } | null => {
   if (buffer.length < FRAME_SIZE) return null;
 
   for (let i = 0; i <= buffer.length - FRAME_SIZE; i++) {
     if (buffer[i] !== FRAME_HEADER) continue;
 
     const frame = buffer.slice(i, i + FRAME_SIZE);
-    const points = tryParseFrame(frame);
+    const points = tryParseFrame(frame, sessionId);
     if (points) {
       return { points, consumed: i + FRAME_SIZE };
     }

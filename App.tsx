@@ -86,6 +86,7 @@ function App() {
   const readerRef = useRef<any>(null);
   const keepReadingRef = useRef(false);
   const isDisconnectingRef = useRef(false);
+  const sessionIdRef = useRef<Uint8Array>(new Uint8Array(8)); // 每次连接随机生成，用于 Nonce 派生
 
   // --- Persistent Settings ---
   const [language, setLanguage] = usePersistentState<Language>('app_language', 'zh');
@@ -475,7 +476,7 @@ function App() {
 
           // 扫描并解析完整帧
           while (byteBuffer.length >= 206) {
-            const result = scanFrame(byteBuffer);
+            const result = scanFrame(byteBuffer, sessionIdRef.current);
             if (result) {
               if (!hasValidDataRef.current) {
                 hasValidDataRef.current = true;
@@ -643,6 +644,29 @@ function App() {
     setConnected(true);
     keepReadingRef.current = true;
     hasValidDataRef.current = false;
+
+    // 生成 8 字节随机会话 ID，组装 11 字节握手包发送给 MCU
+    // 格式: [0x55 帧头] [0x01 命令] [8 字节 Session ID LE] [1 字节校验和]
+    const sessionId = new Uint8Array(8);
+    crypto.getRandomValues(sessionId);
+    sessionIdRef.current = sessionId;
+    const handshake = new Uint8Array(11);
+    handshake[0] = 0x55;         // 帧头
+    handshake[1] = 0x01;         // 命令码：会话建立
+    handshake.set(sessionId, 2); // 会话 ID（小端序，字节 2~9）
+    let checksum = 0;
+    for (let i = 0; i < 10; i++) checksum += handshake[i];
+    handshake[10] = checksum & 0xFF; // 校验和
+    try {
+      const writer = p.writable?.getWriter();
+      if (writer) {
+        await writer.write(handshake);
+        writer.releaseLock();
+        console.log("Handshake sent, session ID:", Array.from(sessionId).map(b => b.toString(16).padStart(2, '0')).join(' '));
+      }
+    } catch (e) {
+      console.warn("Failed to send handshake:", e);
+    }
 
     readLoopPromiseRef.current = readLoop(p);
     console.log("Port connected successfully");
