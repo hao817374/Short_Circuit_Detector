@@ -62,7 +62,7 @@ function App() {
   const [connectionError, setConnectionError] = useState<string | null>(null);
   const [skipWelcome, setSkipWelcome] = usePersistentState('cfg_skipWelcome', false);
   const [isDeveloperMode, setIsDeveloperMode] = usePersistentState('cfg_isDevMode', false);
-  const [isEncryptedMode, setIsEncryptedMode] = usePersistentState('cfg_encryptedMode', false);
+
 
   // Auto-dismiss connection errors after 6 seconds
   useEffect(() => {
@@ -447,91 +447,8 @@ function App() {
   const hasValidDataRef = useRef(false);
   const dataTimeoutRef = useRef<any>(null);
 
-  /**
-   * 串口读取主循环：TextDecoderStream 解码 → 按行拆分 → 4 字段解析 → 帧提交
-   * 硬件每行输出 "index value flag1 flag2"，每 POINTS_PER_FRAME 行以 "next" 标记帧结束
-   */
+  // 串口读取主循环：读取原始字节 → 帧同步 → ChaCha20 解密 → 帧提交
   const readLoop = async (currentPort: SerialPort) => {
-    let reader;
-    let streamPromise;
-    let textDecoder;
-
-    try {
-      if (!currentPort.readable) {
-        throw new Error("Port not readable");
-      }
-      textDecoder = new TextDecoderStream();
-      streamPromise = currentPort.readable.pipeTo(textDecoder.writable);
-      reader = textDecoder.readable.getReader();
-      readerRef.current = reader;
-    } catch (e) {
-      console.error("Failed to get reader:", e);
-      disconnectSerial();
-      return;
-    }
-
-    let buffer = "";
-
-    try {
-      while (keepReadingRef.current) {
-        const { value, done } = await reader.read();
-        if (done) break;
-        if (value) {
-          buffer += value;
-          const lines = buffer.split(/\r?\n/);
-          buffer = lines.pop() || "";
-          for (const line of lines) {
-            const trimmedLine = line.trim();
-            if (!trimmedLine) continue;
-
-            // "next" 是硬件帧结束标记，触发帧提交
-            if (trimmedLine.includes("next")) {
-              commitFrame();
-              continue;
-            }
-
-            // 按空格拆分：index value flag1 flag2（4 个整数字段）
-            const parts = trimmedLine.split(/\s+/);
-            if (parts.length === 4) {
-              const p1 = parseInt(parts[0], 10);  // index：数据点序号（0-102）
-              const p2 = parseInt(parts[1], 10);  // value：ADC 采样值
-              const p3 = parseInt(parts[2], 10);  // flag1：Q0 通道极性/方位位
-              const p4 = parseInt(parts[3], 10);  // flag2：Q1 通道极性/方位位
-
-              if (!isNaN(p1) && !isNaN(p2) && !isNaN(p3) && !isNaN(p4)) {
-                // 首帧有效数据到达时解除 isConnecting 遮罩
-                if (!hasValidDataRef.current) {
-                  hasValidDataRef.current = true;
-                  setIsConnecting(false);
-                }
-                tempDebugBuffer.current.push({ index: p1, value: p2, flag1: p3, flag2: p4 });
-                if (tempDebugBuffer.current.length >= POINTS_PER_FRAME) commitFrame();
-              }
-            }
-          }
-        }
-      }
-    } catch (e) {
-      console.error("Read Loop Error:", e);
-    } finally {
-      console.log("Releasing reader lock");
-      try {
-        await reader.cancel();
-      } catch (e) { }
-
-      try {
-        await streamPromise.catch(() => { });
-      } catch (e) { }
-
-      // If we exit loop unexpectedly (error), ensure cleanup
-      if (keepReadingRef.current) {
-        disconnectSerial();
-      }
-    }
-  };
-
-  // 加密二进制协议 readLoop：读取原始字节 → 帧同步 → 解密 → DebugPoint[]
-  const readLoopBinary = async (currentPort: SerialPort) => {
     let reader;
     try {
       if (!currentPort.readable) throw new Error("Port not readable");
@@ -727,7 +644,7 @@ function App() {
     keepReadingRef.current = true;
     hasValidDataRef.current = false;
 
-    readLoopPromiseRef.current = isEncryptedMode ? readLoopBinary(p) : readLoop(p);
+    readLoopPromiseRef.current = readLoop(p);
     console.log("Port connected successfully");
 
     // Timeout Check for Valid Data Formatting
@@ -981,8 +898,6 @@ function App() {
               onEnterDevMode={() => setViewMode('DEBUG')}
               isDeveloperMode={isDeveloperMode}
               setIsDeveloperMode={setIsDeveloperMode}
-              isEncryptedMode={isEncryptedMode}
-              setIsEncryptedMode={setIsEncryptedMode}
             />
           </div>
         )}
