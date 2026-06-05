@@ -151,8 +151,9 @@ export const DebugChart: React.FC<DebugChartProps> = ({
         const availableWidth = contentWidth - padding.left - padding.right;
         const index = Math.round(((clientX - rect.left - padding.left) / availableWidth) * (POINTS_PER_FRAME - 1));
         const clampedIndex = Math.max(0, Math.min(POINTS_PER_FRAME - 1, index));
-        if (draggingWindow === 1) onWin1IndexChange(clampedIndex);
-        else onWin2IndexChange(clampedIndex);
+        const winStartIndex = Math.max(0, clampedIndex - 16); // 窗口起始点 = 拖拽中心 - 16
+        if (draggingWindow === 1) onWin1IndexChange(winStartIndex);
+        else onWin2IndexChange(winStartIndex);
     };
     const handleUp = () => setDraggingWindow(null);
     window.addEventListener('mousemove', handleMove); window.addEventListener('mouseup', handleUp);
@@ -165,7 +166,8 @@ export const DebugChart: React.FC<DebugChartProps> = ({
 
   const renderWindowOverlay = (startIndex: number, colorClass: string, id: 1 | 2) => {
       if (data.length === 0) return null;
-      const handleX = getX(startIndex);
+      const centerIndex = startIndex + 16; // 窗口中心 = 起始点 + 16（32点窗口的几何中心）
+      const handleX = getX(centerIndex);
       const isDragging = draggingWindow === id;
       return (
           <g key={`win-${id}`}>
@@ -189,8 +191,8 @@ export const DebugChart: React.FC<DebugChartProps> = ({
     const trimCount = 6; 
     
     const windowPoints: number[] = [];
-    for (let i = -16; i < 16; i++) {
-        const idx = (startIndex + i + POINTS_PER_FRAME) % POINTS_PER_FRAME;
+    for (let i = 0; i < windowSize; i++) {
+        const idx = (startIndex + i) % POINTS_PER_FRAME;
         if (data[idx]) windowPoints.push(data[idx].value + globalOffset);
     }
     if (windowPoints.length < windowSize) return null;
@@ -199,8 +201,8 @@ export const DebugChart: React.FC<DebugChartProps> = ({
     const validMin = sorted[trimCount];
     const validMax = sorted[windowSize - 1 - trimCount];
 
-    const xStart = getX(startIndex - 16);
-    const xEnd = getX(startIndex + 16);
+    const xStart = getX(startIndex);
+    const xEnd = getX(startIndex + windowSize - 1);
     const yTop = getY(validMax);
     const yBottom = getY(validMin);
 
