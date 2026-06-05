@@ -1,7 +1,7 @@
 
 import React, { useState, useMemo, useRef, useEffect } from 'react';
 import { DebugPoint, Language, POINTS_PER_FRAME } from '../types';
-import { getWindowAvg } from '../utils/dsp';
+import { getWindowAvg, WINDOW_SIZE, TRIM_COUNT, WINDOW_CENTER_OFFSET } from '../utils/dsp';
 import {
   Pause, Play, GripHorizontal,
   ArrowDownLeft, ArrowDownRight, ArrowUpLeft, ArrowUpRight, ArrowUp, ArrowDown, ArrowLeft, ArrowRight,
@@ -151,7 +151,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
         const availableWidth = contentWidth - padding.left - padding.right;
         const index = Math.round(((clientX - rect.left - padding.left) / availableWidth) * (POINTS_PER_FRAME - 1));
         const clampedIndex = Math.max(0, Math.min(POINTS_PER_FRAME - 1, index));
-        const winStartIndex = Math.max(0, clampedIndex - 16); // 窗口起始点 = 拖拽中心 - 16
+        const winStartIndex = Math.max(0, clampedIndex - WINDOW_CENTER_OFFSET); // 窗口起始点 = 中心 - WINDOW_CENTER_OFFSET
         if (draggingWindow === 1) onWin1IndexChange(winStartIndex);
         else onWin2IndexChange(winStartIndex);
     };
@@ -166,7 +166,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
 
   const renderWindowOverlay = (startIndex: number, colorClass: string, id: 1 | 2) => {
       if (data.length === 0) return null;
-      const centerIndex = startIndex + 16; // 窗口中心 = 起始点 + 16（32点窗口的几何中心）
+      const centerIndex = startIndex + WINDOW_CENTER_OFFSET; // 窗口中心 = 起始点 + WINDOW_CENTER_OFFSET
       const handleX = getX(centerIndex);
       const isDragging = draggingWindow === id;
       return (
@@ -187,22 +187,19 @@ export const DebugChart: React.FC<DebugChartProps> = ({
 
   const renderDSPWindowShadow = (startIndex: number, colorClass: string) => {
     if (data.length === 0) return null;
-    const windowSize = 32;
-    const trimCount = 6; 
-    
     const windowPoints: number[] = [];
-    for (let i = 0; i < windowSize; i++) {
+    for (let i = 0; i < WINDOW_SIZE; i++) {
         const idx = (startIndex + i) % POINTS_PER_FRAME;
         if (data[idx]) windowPoints.push(data[idx].value + globalOffset);
     }
-    if (windowPoints.length < windowSize) return null;
+    if (windowPoints.length < WINDOW_SIZE) return null;
 
     const sorted = [...windowPoints].sort((a, b) => a - b);
-    const validMin = sorted[trimCount];
-    const validMax = sorted[windowSize - 1 - trimCount];
+    const validMin = sorted[TRIM_COUNT];
+    const validMax = sorted[WINDOW_SIZE - 1 - TRIM_COUNT];
 
     const xStart = getX(startIndex);
-    const xEnd = getX(startIndex + windowSize - 1);
+    const xEnd = getX(startIndex + WINDOW_SIZE - 1);
     const yTop = getY(validMax);
     const yBottom = getY(validMin);
 
