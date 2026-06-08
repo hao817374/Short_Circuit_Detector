@@ -14,6 +14,10 @@ type ViewMode = 'COMPASS' | 'CALIBRATION' | 'DEBUG' | 'SETTINGS';
 
 import { getWindowAvg, WINDOW_SIZE, WINDOW_CENTER_OFFSET } from './utils/dsp';
 
+// DSP 采样窗口默认起始索引：WIN1 位于 Q0 通道区域（帧前半段），WIN2 位于 Q1 通道区域（帧后半段）
+const DEFAULT_WIN1_INDEX = 14;
+const DEFAULT_WIN2_INDEX = 66;
+
 /**
  * 方向映射查找表：atan2(ref) → 罗盘 heading
  * 公式：heading = (360 - ref) % 360
@@ -146,8 +150,8 @@ function App() {
   /**
    * 核心算法与检测参数：持久化保存滑动窗口起点索引、全局零偏补偿值以及短路报警阈值
    */
-  const [win1Index, setWin1Index] = usePersistentState('cfg_win1Index', 25);
-  const [win2Index, setWin2Index] = usePersistentState('cfg_win2Index', 75);
+  const [win1Index, setWin1Index] = usePersistentState('cfg_win1Index', DEFAULT_WIN1_INDEX);
+  const [win2Index, setWin2Index] = usePersistentState('cfg_win2Index', DEFAULT_WIN2_INDEX);
   const [globalOffset, setGlobalOffset] = usePersistentState('cfg_globalOffset', 160);
   const [threshold, setThreshold] = usePersistentState('cfg_threshold', 50); //短路阈值默认值
 
@@ -200,7 +204,7 @@ function App() {
    * 高频计算参数同步：将 React 状态实时同步到 Ref 容器，确保高频数据管线以零开销获取最新配置，规避闭包过期
    */
   const stateRef = useRef({
-    w1Idx: 25, w2Idx: 75, gOff: 160,
+    w1Idx: DEFAULT_WIN1_INDEX, w2Idx: DEFAULT_WIN2_INDEX, gOff: 160,
     w1Off: 0, w2Off: 0,
     matrix: [1, 0, 0, 1] as [number, number, number, number],
     probeT: -3000,

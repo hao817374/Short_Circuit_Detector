@@ -88,6 +88,9 @@ export const DebugChart: React.FC<DebugChartProps> = ({
    // 保存当前 SVG 容器的物理像素宽高
    const [dimensions, setDimensions] = useState({ width: 0, height: 0 });
 
+   // 鼠标悬停悬浮窗状态：记录当前鼠标位置对应的数据点索引、ADC 数值、SVG 画布坐标及屏幕坐标
+   const [tooltip, setTooltip] = useState<{ index: number; value: number; svgX: number; svgY: number; screenX: number; screenY: number } | null>(null);
+
    /**
     * 自适应容器尺寸监听
     * 利用浏览器原生的 ResizeObserver 监听容器大小变化。
@@ -503,7 +506,38 @@ export const DebugChart: React.FC<DebugChartProps> = ({
             {data.length === 0 ? (
                <div className="absolute inset-0 flex items-center justify-center text-slate-400 dark:text-slate-800 font-mono uppercase text-sm tracking-[0.4em] animate-pulse">Signal Monitoring Offline</div>
             ) : (
-               <svg ref={svgRef} viewBox={`0 0 ${contentWidth} ${contentHeight}`} className="w-full h-full select-none" preserveAspectRatio="none">
+               <svg ref={svgRef} viewBox={`0 0 ${contentWidth} ${contentHeight}`} className="w-full h-full select-none" preserveAspectRatio="none"
+                  onMouseMove={(e) => {
+                     if (!svgRef.current) return;
+                     const rect = svgRef.current.getBoundingClientRect();
+                     const mx = e.clientX - rect.left;
+                     const my = e.clientY - rect.top;
+                     // 仅当鼠标同时在 X 轴和 Y 轴绘制范围内时才显示悬浮窗
+                     if (mx < padding.left || mx > contentWidth - padding.right
+                         || my < padding.top || my > contentHeight - padding.bottom) {
+                        setTooltip(null);
+                        return;
+                     }
+                     // 将鼠标的物理像素 X 坐标逆向映射为数据点索引
+                     const availableWidth = Math.max(1, contentWidth - padding.left - padding.right);
+                     const index = Math.round(((mx - padding.left) / availableWidth) * (POINTS_PER_FRAME - 1));
+                     // 钳制索引范围，防止鼠标在 SVG 边缘时越界
+                     const clampedIndex = Math.max(0, Math.min(POINTS_PER_FRAME - 1, index));
+                     if (data[clampedIndex]) {
+                        const val = data[clampedIndex].value + globalOffset;
+                        const svgX = getX(clampedIndex);
+                        const svgY = getY(val);
+                        setTooltip({
+                           index: clampedIndex,
+                           value: Math.round(val),
+                           svgX, svgY,
+                           screenX: e.clientX,
+                           screenY: e.clientY,
+                        });
+                     }
+                  }}
+                  onMouseLeave={() => setTooltip(null)}
+                  >
                   <defs><linearGradient id="waveGradient" x1="0" y1="0" x2="0" y2="1"><stop offset="0%" stopColor="#22d3ee" stopOpacity="0.2" /><stop offset="100%" stopColor="#22d3ee" stopOpacity="0" /></linearGradient></defs>
                   <g className="text-slate-400 dark:text-slate-500 font-mono text-[11px] font-bold transition-colors">
                      <line x1={padding.left} y1={padding.top} x2={padding.left} y2={contentHeight - padding.bottom} stroke="currentColor" opacity="0.3" strokeWidth="2" />
@@ -517,7 +551,7 @@ export const DebugChart: React.FC<DebugChartProps> = ({
                         );
                      })}
                      <line x1={padding.left} y1={contentHeight - padding.bottom} x2={contentWidth - padding.right} y2={contentHeight - padding.bottom} stroke="currentColor" opacity="0.3" strokeWidth="2" />
-                     {[0, 25, 50, 75, 102].map((idx) => {
+                     {Array.from({ length: Math.ceil(POINTS_PER_FRAME / 10) + 1 }, (_, i) => Math.min(i * 10, POINTS_PER_FRAME - 1)).map((idx) => {
                         const x = getX(idx);
                         return (
                            <g key={idx}>
@@ -530,6 +564,23 @@ export const DebugChart: React.FC<DebugChartProps> = ({
                   <polygon points={areaPointsString} fill="url(#waveGradient)" />
                   <polyline points={pointsString} fill="none" stroke={isPaused ? "#f59e0b" : "#0ea5e9"} strokeWidth="3" strokeLinejoin="round" className="drop-shadow-[0_0_10px_rgba(14,165,233,0.3)] dark:drop-shadow-[0_0_15px_rgba(34,211,238,0.5)]" />
 
+                  {/* 鼠标悬停辅助线：竖直虚线与波形相交，交点处绘制圆点标记 */}
+                  {tooltip && (
+                     <g className="pointer-events-none">
+                        <line
+                           x1={tooltip.svgX} y1={padding.top}
+                           x2={tooltip.svgX} y2={contentHeight - padding.bottom}
+                           stroke="currentColor" className="text-slate-400 dark:text-slate-500"
+                           strokeWidth="1" strokeDasharray="4 4" opacity="0.6"
+                        />
+                        <circle
+                           cx={tooltip.svgX} cy={tooltip.svgY} r="4"
+                           className="fill-cyan-400 stroke-white dark:stroke-slate-950"
+                           strokeWidth="2"
+                        />
+                     </g>
+                  )}
+
                   {renderDSPWindowShadow(win1Index, "fill-emerald-500")}
                   {renderDSPWindowShadow(win2Index, "fill-violet-500")}
 
@@ -537,6 +588,30 @@ export const DebugChart: React.FC<DebugChartProps> = ({
                   {renderWindowOverlay(win2Index, "text-violet-600 dark:text-violet-500 fill-violet-600 dark:fill-violet-500", 2)}
                </svg>
             )}
+            {/* 鼠标悬停悬浮窗：显示当前数据点的序号与经零点偏移后的 ADC 数值，自动贴边避让 */}
+            {tooltip && (() => {
+               const tipWidth = 160;  // 悬浮窗估算宽度（px），用于右边界贴边判定
+               const isNearRight = tooltip.screenX > window.innerWidth - tipWidth - 20;
+               return (
+                  <div
+                     className="fixed z-[200] pointer-events-none px-3 py-2 rounded-xl bg-white/95 dark:bg-slate-900/95 border border-slate-300 dark:border-white/10 shadow-xl backdrop-blur-md font-mono text-xs transition-colors"
+                     style={{
+                        left: isNearRight ? tooltip.screenX - tipWidth - 12 : tooltip.screenX + 12,
+                        top: tooltip.screenY - 12,
+                        transform: 'translateY(-100%)',
+                     }}
+                  >
+                     <div className="flex items-center gap-3">
+                        <span className="text-slate-400 dark:text-slate-500">{language === 'zh' ? '序号' : 'IDX'}</span>
+                        <span className="text-slate-700 dark:text-slate-200 font-bold tabular-nums">{tooltip.index}</span>
+                     </div>
+                     <div className="flex items-center gap-3 mt-1">
+                        <span className="text-slate-400 dark:text-slate-500">{language === 'zh' ? '数值' : 'VAL'}</span>
+                        <span className="text-cyan-600 dark:text-cyan-400 font-bold tabular-nums">{tooltip.value}</span>
+                     </div>
+                  </div>
+               );
+            })()}
          </div>
       </div>
    );
