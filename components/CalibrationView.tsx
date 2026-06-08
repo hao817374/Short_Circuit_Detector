@@ -2,31 +2,50 @@ import React, { useEffect, useRef } from 'react';
 import { Language, DebugPoint, POINTS_PER_FRAME } from '../types';
 import { CheckCircle2, Crosshair, Zap, Navigation, Scale, Signal, Trash2 } from 'lucide-react';
 
+/**
+ * 空间与零点校准视图组件属性定义
+ * 本组件为纯展示层（Dumb Component），所有核心校准算法与状态流转均由父组件（App.tsx）管理并下发。
+ */
 interface CalibrationViewProps {
-  connected: boolean;
-  language: Language;
-  // Zero calibration
-  isZeroSampling: boolean;
-  zeroCalibEverRun: boolean;
-  zeroCalibResult: { q0: number; q1: number; bias: number } | null;
-  zeroCalibStatus: 'IDLE' | 'SUCCESS' | 'FAILED';
-  onZeroCalibrate: () => void;
-  // Direction calibration
+  connected: boolean;                                                 // 串口是否连接
+  language: Language;                                                 // 当前界面语言
+
+  // --- 零点校准 (Zero Calibration) ---
+  isZeroSampling: boolean;                                            // 是否正在进行零点采样（触发进度条动画）
+  zeroCalibEverRun: boolean;                                          // 软件生命周期内是否执行过至少一次零点校准
+  zeroCalibResult: { q0: number; q1: number; bias: number } | null;   // 零点校准的结果（通道底噪偏移量和直流偏置）
+  zeroCalibStatus: 'IDLE' | 'SUCCESS' | 'FAILED';                     // 零点校准的状态机
+  onZeroCalibrate: () => void;                                        // 触发零点校准的回调
+
+  // --- 空间方向校准 (Direction Calibration) ---
+  // 记录特定方位（如 "NW" 右上, "SW" 右下）采集到的基准向量。这些向量将用于构建空间映射的解耦矩阵。
   calibRefVectors: Record<string, { q0: number; q1: number } | null>;
-  samplingStep: string | null;
-  spatialCalibStatus: Record<string, 'IDLE' | 'SUCCESS' | 'FAILED'>;
-  sampleProgress: number;
-  allCalibrated: boolean;
-  onSpatialCalibrate: (step: string) => void;
-  // Actions
-  onResetCalibration: () => void;
-  onConfirm: () => void;
-  // Waveform preview
-  debugData: DebugPoint[];
-  globalOffset: number;
-  previewBounds: { min: number; max: number; range: number };
+  samplingStep: string | null;                                        // 当前正在采样的方位（如 "NW" 或 "SW"）
+  spatialCalibStatus: Record<string, 'IDLE' | 'SUCCESS' | 'FAILED'>;  // 各个方位的独立校准状态
+  sampleProgress: number;                                             // 当前方位的采样进度百分比 (0-100)
+  allCalibrated: boolean;                                             // 是否所有方向校准步骤（NW + SW）均已完成
+  onSpatialCalibrate: (step: string) => void;                         // 触发指定方位空间校准的回调
+
+  // --- 全局动作 (Actions) ---
+  onResetCalibration: () => void;                                     // 清除所有校准数据，恢复出厂默认值
+  onConfirm: () => void;                                              // 确认并应用校准矩阵，跳转回主界面
+
+  // --- 波形预览 (Waveform Preview) ---
+  debugData: DebugPoint[];                                            // 用于在底部实时绘制信号波形的点集数据
+  globalOffset: number;                                               // 波形绘制的全局 Y 轴偏移量
+  previewBounds: { min: number; max: number; range: number };         // 波形图的 Y 轴自适应缩放边界
 }
 
+/**
+ * 空间与零点校准视图组件（Calibration View Component）
+ * 
+ * 这是一个纯展示型组件（UI Component），负责呈现整个仪器的校准工作流，主要包括：
+ * 1. 零点校准（底噪和直流偏置消除）：提供操作引导、动画进度条以及校准结果展示。
+ * 2. 空间方向校准（解耦矩阵计算）：引导用户在硬件平面的不同基准点（如右上、右下）进行特定采样。
+ * 3. 实时波形预览：在底部嵌入内联 SVG 波形图，帮助用户在操作表笔时实时确认信号的稳定性
+ * 
+ * 组件通过解构 `CalibrationViewProps` 接收来自 `App.tsx` 的全局状态与操作句柄。
+ */
 export const CalibrationView: React.FC<CalibrationViewProps> = ({
   connected, language,
   isZeroSampling, zeroCalibEverRun, zeroCalibResult, zeroCalibStatus, onZeroCalibrate,
@@ -34,19 +53,33 @@ export const CalibrationView: React.FC<CalibrationViewProps> = ({
   onResetCalibration, onConfirm,
   debugData, globalOffset, previewBounds,
 }) => {
+  // 用于获取零点校准进度条 DOM 节点的引用，以便直接操作 CSS 动画
   const zeroBarRef = useRef<HTMLDivElement>(null);
 
+  /**
+   * 零点校准进度条动画效果
+   * 当 isZeroSampling 变为 true 时触发。
+   * 零点采样由于是纯底噪采集，App.tsx 设定了固定的 1 秒时间（100 帧）。
+   * 此处使用 requestAnimationFrame 配合 CSS transition 实现平滑的 1 秒填充动画，
+   * 避免了由 React 状态频繁更新（每秒 100 次）带来的渲染开销。
+   */
   useEffect(() => {
     if (isZeroSampling && zeroBarRef.current) {
       const el = zeroBarRef.current;
+      // 重置进度条到 0%
       el.style.width = '0%';
       el.style.transition = 'width 1s linear';
+      // 利用双重 rAF 确保浏览器渲染了 0% 的初始状态，然后再将目标宽度设为 100% 触发 CSS 过渡
       requestAnimationFrame(() => {
         requestAnimationFrame(() => { el.style.width = '100%'; });
       });
     }
   }, [isZeroSampling]);
 
+  /**
+   * 本地化字典 (i18n)
+   * 提取公共文案以保持渲染部分的整洁，根据 language 动态切换。
+   */
   const t = {
     title: language === 'zh' ? "校准" : "CALIBRATION",
     zeroTitle: language === 'zh' ? "零点校准" : "ZERO CALIBRATION",

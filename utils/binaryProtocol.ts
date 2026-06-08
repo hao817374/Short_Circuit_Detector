@@ -51,7 +51,7 @@ export const tryParseFrame = (frame: Uint8Array, sessionId: Uint8Array): DebugPo
 
 // 从字节缓冲区扫描并提取第一个有效帧
 // 返回 { points, consumed } — consumed 是消耗的字节数（跳到帧尾后）
-// 如果没找到有效帧，返回 null（保留缓冲区等待更多数据）
+// 如果没找到有效帧，返回 null（由调用方决定如何保留或清理缓冲区数据）
 export const scanFrame = (buffer: Uint8Array, sessionId: Uint8Array): { points: DebugPoint[]; consumed: number } | null => {
   if (buffer.length < FRAME_SIZE) return null;
 

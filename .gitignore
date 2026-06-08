@@ -34,6 +34,7 @@ yarn-error.log*
 # OS Metadata
 Thumbs.db
 desktop.ini
+*:Zone.Identifier
 
 # Temp / Backup
 *.tmp

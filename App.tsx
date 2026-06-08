@@ -31,68 +31,110 @@ const DEFAULT_MAP = [
   { ref: 315, heading: 45 },    // ref 数学右下(SE) → heading 右上(NE)
 ];
 
-// Helper hook for localStorage persistence
+/**
+ * 自定义 Hook 函数，用于将状态（State）自动同步且持久化存储到浏览器的 localStorage 中。
+ * 
+ * @template T - 泛型参数，代表该状态的实际数据类型（如：boolean, number, 数组，矩阵对象等），实现类型安全。
+ * @param {string} key - 存储在 localStorage 键值对数据库中的唯一键（Key）名称。
+ * @param {T} initialValue - 默认初始值。如果本地没有找到历史存储，就使用此值。
+ * 
+ * @returns {[T, React.Dispatch<React.SetStateAction<T>>]} 
+ *   返回一个长度为 2 的元组（数组），格式和 React 原生 useState 相同：
+ *   - 索引 0 (T)：当前的最新状态值。
+ *   - 索引 1 (函数)：用于修改该状态的 Setter 回调函数。
+ */
 function usePersistentState<T>(key: string, initialValue: T): [T, React.Dispatch<React.SetStateAction<T>>] {
+  // 1. 初始化 React 内部状态。
+  // 传入匿名函数 () => { ... } 进行“惰性初始化”：只在组件初次加载时运行一次，避免每次重绘都去执行缓慢的磁盘 I/O。
   const [state, setState] = useState<T>(() => {
     try {
+      // 从浏览器的本地存储（类似单片机 Flash/EEPROM）中读取对应键的字符串
       const item = localStorage.getItem(key);
+      // 如果读取到了数据，就用 JSON.parse 将 JSON 字符串还原为原本的数据类型；如果没有，则使用传入的默认初始值
       return item ? JSON.parse(item) : initialValue;
     } catch (error) {
+      // 如果读取或解析过程发生异常（如数据损坏），打印错误日志，并使用默认初始值作为兜底安全返回
       console.error(`Error reading ${key} from localStorage`, error);
       return initialValue;
     }
   });
 
+  // 2. 注册数据“看门狗”副作用（副作用监听器）。
+  // 当 [key, state] 中的任何一个发生改变时（特别是调用 setState 更新数值时），都会自动触发此函数。
   useEffect(() => {
     try {
+      // 使用 JSON.stringify 将 state 中的各种类型数据（如矩阵数组、数值）序列化为标准的 JSON 字符串，
+      // 然后同步写入 localStorage 数据库中，实现自动存盘。
       localStorage.setItem(key, JSON.stringify(state));
     } catch (error) {
+      // 如果写入磁盘失败（如浏览器存储空间满），打印日志提示，保证主程序不崩溃
       console.error(`Error saving ${key} to localStorage`, error);
     }
-  }, [key, state]);
+  }, [key, state]); // 依赖项：只有当 key 改变或者 state 状态改变时才重新执行此持久化写入操作
 
+  // 3. 返回元组。返回的对象和原生的 useState 用法完全吻合，使得它可以像普通的 useState 一样在外部被解构使用。
   return [state, setState];
 }
 
+
 function App() {
-  const [viewMode, setViewMode] = useState<ViewMode>('COMPASS');
-  const [port, setPort] = useState<SerialPort | null>(null);
-  const [connected, setConnected] = useState(false);
-  const [isConnecting, setIsConnecting] = useState(false);
-  const [connectionError, setConnectionError] = useState<string | null>(null);
-  const [skipWelcome, setSkipWelcome] = usePersistentState('cfg_skipWelcome', false);
-  const [isDeveloperMode, setIsDeveloperMode] = usePersistentState('cfg_isDevMode', false);
+  // ==================== 第一段：状态声明（类似 C 的变量定义） ====================
+  const [viewMode, setViewMode] = useState<ViewMode>('COMPASS'); // 视图模式状态：决定主容器渲染哪个 Tab 页面（COMPASS:罗盘, CALIBRATION:校准, DEBUG:调试示波器, SETTINGS:配置项）
+  const [port, setPort] = useState<SerialPort | null>(null); // 物理串口句柄：连接成功时为 SerialPort 对象，断开时为 null，供数据读写流操作使用
+  const [connected, setConnected] = useState(false);  // 连接状态标志：为 true 表示串口已打开且握手校验（Session ACK）成功，驱动罗盘开始工作
+  const [isConnecting, setIsConnecting] = useState(false); // 连接中标志：为 true 时在界面弹出全屏毛玻璃加载遮罩，提示用户正在等待设备应答
+  const [connectionError, setConnectionError] = useState<string | null>(null); // 连接错误信息：保存串口被占用或握手失败的文字提示，触发底部红色浮动报错框（6秒后自动清空）
+  const [skipWelcome, setSkipWelcome] = usePersistentState('cfg_skipWelcome', false); // 引导页跳过标志：持久化存储，若为 true 则开机时不显示 Welcome 引导屏直接进罗盘
+  const [isDeveloperMode, setIsDeveloperMode] = usePersistentState('cfg_isDevMode', false); // 开发者模式标志：持久化存储，为 true 时顶部导航条才会解锁显示“调试分析 (DEBUG)”入口
 
-
-  // Auto-dismiss connection errors after 6 seconds
+  /**
+   * 连接错误气泡自动清除看门狗：如果产生连接错误，在 6 秒后自动将错误清空，使气泡消失
+   */
   useEffect(() => {
     if (connectionError) {
       const timer = setTimeout(() => setConnectionError(null), 6000);
       return () => clearTimeout(timer);
     }
   }, [connectionError]);
+
+  /**
+   * 示波器暂停控制状态：用于控制调试界面(DEBUG)下的示波器波形图是否暂停刷新
+   */
   const [isPaused, setIsPaused] = useState(false);
   const isPausedRef = useRef(false);
 
+  /**
+   * 罗盘主数据状态：保存解算后的角度、幅值、X/Y 轴分量及表笔连接状态，直接传递给罗盘 HUD 界面渲染
+   */
   const [compassData, setCompassData] = useState<CompassData>({
     q0: 0, q1: 0, rawQ0: 0, rawQ1: 0, q0Bit: 0, q1Bit: 0, heading: 0, magnitude: 0, rawCode: "00", status: "Waiting",
     balanceFactor: 1.0, axisToCompensate: 'NONE'
   });
 
+  /**
+   * 调试波形数据与缓存：debugData 用于示波器图表渲染，tempDebugBuffer 作为串口高频数据接收的单帧临时缓冲区
+   */
   const [debugData, setDebugData] = useState<DebugPoint[]>([]);
   const tempDebugBuffer = useRef<DebugPoint[]>([]);
 
+  /**
+   * 串口底层连接控制器：在常驻异步循环中保存物理串口指针、流读取器、读取开关及随机会话 ID，对 UI 透明以避免性能卡顿
+   */
   const portRef = useRef<SerialPort | null>(null);
   const readerRef = useRef<any>(null);
   const keepReadingRef = useRef(false);
   const isDisconnectingRef = useRef(false);
-  const sessionIdRef = useRef<Uint8Array>(new Uint8Array(8)); // 每次连接随机生成，用于 Nonce 派生
+  const sessionIdRef = useRef<Uint8Array>(new Uint8Array(8)); // 每次连接时随机生成，用于 Nonce 派生解密
 
-  // --- Persistent Settings ---
+  /**
+   * 基础应用配置：中/英文切换与暗色/亮色主题模式，状态自动持久化本地存储
+   */
   const [language, setLanguage] = usePersistentState<Language>('app_language', 'zh');
   const [themeMode, setThemeMode] = usePersistentState<ThemeMode>('app_theme', 'dark');
 
-  // Apply Theme Mode to HTML Element
+  /**
+   * 主题应用监听：当 themeMode 改变时，在 HTML 根元素切换 'dark' 类以触发 Tailwind 样式
+   */
   useEffect(() => {
     if (themeMode === 'dark') {
       document.documentElement.classList.add('dark');
@@ -101,43 +143,62 @@ function App() {
     }
   }, [themeMode]);
 
+  /**
+   * 核心算法与检测参数：持久化保存滑动窗口起点索引、全局零偏补偿值以及短路报警阈值
+   */
   const [win1Index, setWin1Index] = usePersistentState('cfg_win1Index', 25);
   const [win2Index, setWin2Index] = usePersistentState('cfg_win2Index', 75);
   const [globalOffset, setGlobalOffset] = usePersistentState('cfg_globalOffset', 160);
   const [threshold, setThreshold] = usePersistentState('cfg_threshold', 50); //短路阈值默认值
 
-  // Advanced Settings Persistence
+  /**
+   * 阈值调节限制：持久化保存短路报警阈值滑块的最小值、最大值及调节步长
+   */
   const [thresholdMin, setThresholdMin] = usePersistentState('cfg_thresholdMin', 5);
   const [thresholdMax, setThresholdMax] = usePersistentState('cfg_thresholdMax', 500);
   const [thresholdStep, setThresholdStep] = usePersistentState('cfg_thresholdStep', 5);
 
+  /**
+   * 窗口微调与探针检测：保存滑动窗口的相位偏置（Offset）和探针有效接触的判定阈值
+   */
   const [win1Offset, setWin1Offset] = usePersistentState('cfg_win1Offset', 0);
   const [win2Offset, setWin2Offset] = usePersistentState('cfg_win2Offset', 0);
   const [probeThreshold, setProbeThreshold] = usePersistentState('cfg_probeThreshold', -3000);
 
-  // Device identity for auto-connect filtering (VID/PID learned on first connection)
+  /**
+   * 设备自动重连识别：记录首次成功连接设备的 VID/PID，通过 Ref 缓存以防自动连接的 useEffect 闭包过期
+   */
   const [deviceVid, setDeviceVid] = usePersistentState<number | null>('cfg_deviceVid', null);
   const [devicePid, setDevicePid] = usePersistentState<number | null>('cfg_devicePid', null);
-  // ref 副本供 findMatchingPort 闭包读取最新值（避免 useEffect([]) 闭包过期）
   const deviceVidRef = useRef(deviceVid);
   const devicePidRef = useRef(devicePid);
   useEffect(() => { deviceVidRef.current = deviceVid; }, [deviceVid]);
   useEffect(() => { devicePidRef.current = devicePid; }, [devicePid]);
 
+  /**
+   * 空间与通道校准：持久化保存 2x2 罗盘校准逆矩阵、增益平衡系数以及当前手动微调的补偿轴向
+   */
   const [calibMatrix, setCalibMatrix] = usePersistentState<[number, number, number, number]>('cfg_calibMatrix', [1, 0, 0, 1]);
   const [balanceFactor, setBalanceFactor] = usePersistentState('cfg_balanceFactor', 1.0);
   const [compAxis, setCompAxis] = useState<'Q0' | 'Q1' | 'NONE'>('NONE');
 
-  // --- Zero Calibration State (Lifted from DebugChart) ---
+  /**
+   * 零偏校准状态管理：控制探针悬空时的零点底噪自动采集，使用 useRef 缓存高频点以避免频繁重绘
+   */
   const [isZeroSampling, setIsZeroSampling] = useState(false);
   const [zeroCalibStatus, setZeroCalibStatus] = useState<'IDLE' | 'SUCCESS' | 'FAILED'>('IDLE');
   const [zeroCalibResult, setZeroCalibResult] = useState<{ q0: number; q1: number; bias: number } | null>(null);
   const [zeroCalibEverRun, setZeroCalibEverRun] = useState(false);
   const zeroSamplingBuffer = useRef<{ q0: number, q1: number }[]>([]);
 
+  /**
+   * 引导式校准步骤：记录当前空间校准/多点校准的具体执行阶段，用于 UI 状态引导
+   */
   const [samplingStep, setSamplingStep] = useState<string | null>(null);
 
-  // Refs for high-speed loop access
+  /**
+   * 高频计算参数同步：将 React 状态实时同步到 Ref 容器，确保高频数据管线以零开销获取最新配置，规避闭包过期
+   */
   const stateRef = useRef({
     w1Idx: 25, w2Idx: 75, gOff: 160,
     w1Off: 0, w2Off: 0,
@@ -158,12 +219,18 @@ function App() {
     };
   }, [win1Index, win2Index, globalOffset, win1Offset, win2Offset, calibMatrix, probeThreshold, isZeroSampling, samplingStep]);
 
+  /**
+   * 双向量空间校准状态：管理“右上角激励源(代码中命名为NW)”与“右下角激励源(代码中命名为SW)”的采样向量、计算状态、采集进度和临时缓冲区
+   */
   const [calibRefVectors, setCalibRefVectors] = useState<Record<string, { q0: number, q1: number } | null>>({ "NW": null, "SW": null });
   const [spatialCalibStatus, setSpatialCalibStatus] = useState<Record<string, 'IDLE' | 'SUCCESS' | 'FAILED'>>({ "NW": 'IDLE', "SW": 'IDLE' });
   const [sampleProgress, setSampleProgress] = useState(0);
   const samplingBuffer = useRef<{ q0: number, q1: number }[]>([]);
   const currentRawValuesRef = useRef<{ q0: number, q1: number }>({ q0: 0, q1: 0 });
 
+  /**
+   * 校准标志派生：计算是否已完成所有方向的校准，或当前校准数据是否均已被清空
+   */
   const allCalibrated = useMemo(() =>
     calibRefVectors["NW"] !== null && calibRefVectors["SW"] !== null
     , [calibRefVectors]);
@@ -172,16 +239,22 @@ function App() {
     calibRefVectors["NW"] === null && calibRefVectors["SW"] === null
     , [calibRefVectors]);
 
+  /**
+   * 示波器暂停控制同步：同步 React 的 isPaused 状态至 Ref，供高频数据解析循环读取，防闭包过期
+   */
   useEffect(() => { isPausedRef.current = isPaused; }, [isPaused]);
 
-  // 帧提交：串口数据管线核心，每 POINTS_PER_FRAME 点触发一次
+  // ==================== 第二段：业务逻辑与函数（类似 C 的子函数） ====================
+  /**
+   * 帧数据解析消费管线：串口解密数据的核心消费管道，执行高频 DSP 滤波与空间解算，并将结果投递给 UI 罗盘
+   */
   const commitFrame = () => {
     if (tempDebugBuffer.current.length >= POINTS_PER_FRAME) {
       const newFrame = tempDebugBuffer.current.slice(0, POINTS_PER_FRAME);
       // 从 ref 读取实时参数（避免闭包捕获过期的 state）
       const { w1Idx, w2Idx, gOff, w1Off, w2Off, matrix, probeT, isZeroSampling: zeroSampling } = stateRef.current;
 
-      // 阶段1：DSP 降噪 — 对 Q0/Q1 各自窗口执行修剪均值
+      // 阶段1：DSP 降噪 — 对 Q0/Q1 各自滑动窗口执行修剪均值滤波并去除底噪偏移
       const baseQ0 = getWindowAvg(newFrame, w1Idx, gOff);
       const baseQ1 = getWindowAvg(newFrame, w2Idx, gOff);
 
@@ -199,7 +272,7 @@ function App() {
 
       currentRawValuesRef.current = { q0: rawQ0, q1: rawQ1 };
 
-      // 阶段5：仿射变换校正 — 将失真矢量映射回正交坐标系
+      // 阶段5：仿射变换校正 — 乘 2x2 逆矩阵纠正 Q0/Q1 通道非正交与增益不平衡，将畸变矢量还原到标准正交坐标系
       const corrQ0 = rawQ0 * matrix[0] + rawQ1 * matrix[1];
       const corrQ1 = rawQ0 * matrix[2] + rawQ1 * matrix[3];
 
@@ -210,7 +283,7 @@ function App() {
         samplingBuffer.current.push({ q0: rawQ0, q1: rawQ1 });
       }
 
-      // 阶段6：方位解码 — 取窗口中心点的 flag 位合成方位码
+      // 阶段6：方位解码 — 取滤波窗口中点的数字 flag 状态，辅助合成为 discrete 调试方位码
       const c1 = (w1Idx + WINDOW_CENTER_OFFSET) % newFrame.length;
       const c2 = (w2Idx + WINDOW_CENTER_OFFSET) % newFrame.length;
       const p1 = newFrame[c1];
@@ -224,6 +297,7 @@ function App() {
           q0: Math.round(corrQ0), q1: Math.round(corrQ1),
           rawQ0: Math.round(rawQ0), rawQ1: Math.round(rawQ1),
           q0Bit: p1.flag1, q1Bit: p2.flag1,
+          // 基于校正后的正切角在映射表中进行最近邻匹配，以输出平滑的罗盘方位
           heading: getNearestHeading(rawAngle, DEFAULT_MAP), magnitude: mag, rawCode: code,
           status: isProbeDisconnected ? "Disconnected" : "Active",
           balanceFactor: balanceFactor, axisToCompensate: 'NONE'
@@ -233,13 +307,14 @@ function App() {
       if (!isPausedRef.current) {
         setDebugData(newFrame);
       }
+      (window as any).__frame = newFrame; // 调试用：控制台输入 __frame 查看当前帧数据
     }
     tempDebugBuffer.current = [];
   };
 
   /**
    * 零点校准：消除 PCB 静态偏置，使短路信号从零基线计算
-   * 流程：采集 1 秒底噪（baseQ0/baseQ1）→ 稳定性检验（range<1000）→ 归零 globalOffset → 计算方差 BIAS
+   * 流程：采集 1 秒底噪（baseQ0/baseQ1）→ 自适应稳定性检验 → 归零 globalOffset → 计算方差 BIAS
    */
   const handleZeroCalibrate = () => {
     if (isZeroSampling) return;
@@ -276,21 +351,21 @@ function App() {
       const rangeQ0 = maxQ0 - minQ0;
       const rangeQ1 = maxQ1 - minQ1;
 
-      // Stability Check:
-      // If fluctuation exceeds 1000 units (3 orders of magnitude), fail.
-      // Typical ADC noise for shorted probes should be much lower (e.g. < 50)
+      // 稳定性校验：
+      // 如果数据波动范围超过设定阈值（代表手抖或表笔接触不良），则判定校准失败。
+      // 正常表笔短接静置时，典型的 ADC 随机底噪通常远小于 1000（一般 < 50）。
       const STABILITY_THRESHOLD = Math.max(1000, Math.max(Math.abs(avgQ0), Math.abs(avgQ1)) * 0.15);
 
       const isStableQ0 = rangeQ0 < STABILITY_THRESHOLD;
       const isStableQ1 = rangeQ1 < STABILITY_THRESHOLD;
 
       if (isStableQ0 && isStableQ1) {
-        // Calibration Logic: Center the signal
+        // 校准解算：扣除两通道直流偏置的平均值，使波形信号重新在零刻度线水平对齐中心
         const totalAvg = (avgQ0 + avgQ1) / 2;
         const newGlobalOffset = Math.round(globalOffset - totalAvg);
         setGlobalOffset(newGlobalOffset);
 
-        // Compute variance for BIAS
+        // 计算方差：用以评估零偏校准后残余波形的底噪标准差（BIAS）
         let varQ0 = 0, varQ1 = 0;
         for (const s of samples) {
           varQ0 += (s.q0 - avgQ0) ** 2;
@@ -310,34 +385,47 @@ function App() {
     }, 1000);
   };
 
+  /**
+   * 最近邻角度匹配：将计算的原始极角归一化到 0-360°，并在映射表中寻找环状最小夹角对应的罗盘目标指向角
+   */
   const getNearestHeading = (rawAngle: number, map: any[]) => {
     let normalized = rawAngle;
+    // 归一化至 [0, 360) 角度区间
     while (normalized < 0) normalized += 360;
     while (normalized >= 360) normalized -= 360;
 
     let minDiff = Infinity;
     let bestHeading = 0;
+    // 遍历映射表，计算环状夹角差值（处理跨 360° 越界的情况）
     for (const item of map) {
       let diff = Math.abs(normalized - item.ref);
-      if (diff > 180) diff = 360 - diff;
+      if (diff > 180) diff = 360 - diff; // 越界补角计算，得到真实环状夹角
       if (diff < minDiff) { minDiff = diff; bestHeading = item.heading; }
     }
     return bestHeading;
   };
 
-  // 方向校准采样：在指定 PCB 角（NW/SW）采集 1 秒 raw 值并取平均
+  /**
+   * 启动方向校准采样：在用户短接特定角激励源（右上角 NW / 右下角 SW）时，采集 1 秒数据并进行稳定性校验，通过后记录其参考向量
+   */
   const startSampling = (step: string) => {
+    // 拦截重复采集操作，且必须在串口已连接时才允许校准
     if (samplingStep !== null || !connected) return;
     setSamplingStep(step);
     setSampleProgress(0);
     samplingBuffer.current = [];
     const startTime = Date.now();
+
+    // 定时轮询，每 30 毫秒刷新进度并在 1 秒后结算采样
     const timer = setInterval(() => {
       const elapsed = Date.now() - startTime;
       setSampleProgress(Math.min(100, (elapsed / 1000) * 100));
+
       if (elapsed >= 1000) {
         clearInterval(timer);
         const samples = samplingBuffer.current;
+
+        // 异常处理：如果没有捕获到任何高频数据包，为保障体验，采用当前的瞬时裸值作为后备采样
         if (samples.length === 0) {
           setCalibRefVectors(prev => ({ ...prev, [step]: { q0: currentRawValuesRef.current.q0, q1: currentRawValuesRef.current.q1 } }));
           setSpatialCalibStatus(prev => ({ ...prev, [step]: 'SUCCESS' }));
@@ -345,6 +433,8 @@ function App() {
           setSamplingStep(null);
           return;
         }
+
+        // 样本数量过少，表明传输极不稳定，判定校准失败
         if (samples.length < 5) {
           setSpatialCalibStatus(prev => ({ ...prev, [step]: 'FAILED' }));
           setTimeout(() => setSpatialCalibStatus(prev => ({ ...prev, [step]: 'IDLE' })), 3000);
@@ -356,6 +446,7 @@ function App() {
         let minQ0 = Infinity, maxQ0 = -Infinity;
         let minQ1 = Infinity, maxQ1 = -Infinity;
 
+        // 统计 1 秒内全部样本的累加值和波动极值
         for (const s of samples) {
           sumQ0 += s.q0;
           sumQ1 += s.q1;
@@ -369,14 +460,19 @@ function App() {
         const avgQ1 = sumQ1 / samples.length;
         const rangeQ0 = maxQ0 - minQ0;
         const rangeQ1 = maxQ1 - minQ1;
+
+        // 稳定性阈值计算（同零点校准）：保证波动在合理范围
         const STABILITY_THRESHOLD = Math.max(1000, Math.max(Math.abs(avgQ0), Math.abs(avgQ1)) * 0.15);
 
+        // 如果波动小于阈值，说明表笔接触稳定且无剧烈抖动，保存平均采样值，否则宣告失败
         if (rangeQ0 < STABILITY_THRESHOLD && rangeQ1 < STABILITY_THRESHOLD) {
           setCalibRefVectors(prev => ({ ...prev, [step]: { q0: avgQ0, q1: avgQ1 } }));
           setSpatialCalibStatus(prev => ({ ...prev, [step]: 'SUCCESS' }));
         } else {
           setSpatialCalibStatus(prev => ({ ...prev, [step]: 'FAILED' }));
         }
+
+        // 3 秒后状态重置为 IDLE，重置步骤状态以允许下一次操作
         setTimeout(() => setSpatialCalibStatus(prev => ({ ...prev, [step]: 'IDLE' })), 3000);
         setSamplingStep(null);
       }
@@ -425,6 +521,9 @@ function App() {
     setCompAxis(mag1 < mag2 ? 'Q0' : 'Q1');
   };
 
+  /**
+   * 重置校准参数：清除空间校准和零偏校准的全部结果，并将纠偏矩阵还原为标准单位阵
+   */
   const resetCalibration = () => {
     setCalibMatrix([1, 0, 0, 1]);
     setBalanceFactor(1.0);
@@ -436,19 +535,26 @@ function App() {
     setZeroCalibStatus('IDLE');
   };
 
+  /**
+   * 确认并应用校准：若双方向均采样完毕则求解仿射逆矩阵，最后切换回罗盘主视图
+   */
   const handleCalibConfirm = () => {
     if (allCalibrated) finishCalibration();
     setViewMode('COMPASS');
   };
 
-
-
+  // --- 串口底层连接生命周期与心跳看门狗 ---
+  /**
+   * 串口底层线程与心跳 Ref：缓存读取循环的 Promise 引用以防断连死锁，并保存数据超时定时器以做假死失联判定
+   */
   const readLoopPromiseRef = useRef<Promise<void> | null>(null);
 
   const hasValidDataRef = useRef(false);
   const dataTimeoutRef = useRef<any>(null);
 
-  // 串口读取主循环：读取原始字节 → 帧同步 → ChaCha20 解密 → 帧提交
+  /**
+   * 串口高频读取主循环：在独立异步逻辑中维持串口流读取，负责高频字节流拼接、帧同步对齐、解密解析并提交数据消费
+   */
   const readLoop = async (currentPort: SerialPort) => {
     let reader;
     try {
@@ -468,25 +574,27 @@ function App() {
         const { value, done } = await reader.read();
         if (done) break;
         if (value && value.length > 0) {
-          // 追加到缓冲区
+          // 将新读取的字节追加到 byteBuffer 缓冲区末尾
           const merged = new Uint8Array(byteBuffer.length + value.length);
           merged.set(byteBuffer);
           merged.set(value, byteBuffer.length);
           byteBuffer = merged;
 
-          // 扫描并解析完整帧
+          // 循环扫描并解析数据包：单个加密帧的固定长度为 206 字节
           while (byteBuffer.length >= 206) {
             const result = scanFrame(byteBuffer, sessionIdRef.current);
             if (result) {
+              // 首包解析成功，代表实质性握手打通，重置 UI 上的连接中加载状态
               if (!hasValidDataRef.current) {
                 hasValidDataRef.current = true;
                 setIsConnecting(false);
               }
+              // 提交波形点集合，触发 commitFrame 处理管线，并截断丢弃已消费的字节
               tempDebugBuffer.current = result.points;
               commitFrame();
               byteBuffer = byteBuffer.slice(result.consumed);
             } else {
-              // 未找到有效帧，寻找下一个 0xAA
+              // 校验失败或当前非 0xAA 帧头，滑动到下一个 0xAA 字节处以重新寻找帧同步起点，防乱码/粘包
               const nextAA = byteBuffer.indexOf(0xAA, 1);
               if (nextAA === -1) {
                 byteBuffer = new Uint8Array(0);
@@ -502,8 +610,8 @@ function App() {
       console.error("Read Loop Error:", e);
     } finally {
       console.log("Releasing reader lock");
-      try { await reader.cancel(); } catch (e) {}
-      try { reader.releaseLock(); } catch (e) {}
+      try { await reader.cancel(); } catch (e) { }
+      try { reader.releaseLock(); } catch (e) { }
       if (keepReadingRef.current) disconnectSerial();
     }
   };
@@ -540,13 +648,17 @@ function App() {
     } catch (e) { /* getInfo not supported */ }
   };
 
+  /**
+   * 建立串口连接：优先尝试基于已保存的 VID/PID 自动静默连接，若匹配失败，则弹出原生选择框供用户授权，连接成功后学习并记录设备身份
+   */
   const connectToPort = async () => {
     if (connected) return;
     setConnectionError(null);
     try {
+      // 安全清理：在开始新连接前，确保旧的连接已彻底断开并释放
       await disconnectSerial();
 
-      // 先检查已知端口中有无 VID/PID 匹配的设备（免弹窗）
+      // 先检查已知端口列表中，是否存在与保存的 VID/PID 匹配的设备
       const matchedPort = await findMatchingPort();
       if (matchedPort) {
         console.log("Connecting to matched device silently...");
@@ -555,7 +667,7 @@ function App() {
         return;
       }
 
-      // 无匹配端口，弹出原生端口选择对话框
+      // 如果没有找到匹配的历史设备，弹出浏览器原生串口选择对话框
       // @ts-ignore
       const p = await navigator.serial.requestPort().catch((err: any) => {
         console.log("Port selection skipped/cancelled:", err.message);
@@ -577,18 +689,25 @@ function App() {
     }
   };
 
+  /**
+   * 安全断开串口连接：按序释放读取器→等待读取循环退出→关闭物理端口，全程防重入保护
+   */
   const disconnectSerial = async () => {
+    // 防重入锁：避免多次并发触发断连导致资源竞争
     if (isDisconnectingRef.current) return;
     isDisconnectingRef.current = true;
     setIsConnecting(false);
 
+    // 清除数据有效性看门狗计时器，防止断连后仍触发超时回调
     if (dataTimeoutRef.current) {
       clearTimeout(dataTimeoutRef.current);
       dataTimeoutRef.current = null;
     }
 
     try {
+      // 步骤1：通知 readLoop 退出 while 循环
       keepReadingRef.current = false;
+      // 步骤2：取消流读取器，使 reader.read() 的 pending Promise 立即 resolve({done:true})
       if (readerRef.current) {
         try {
           await readerRef.current.cancel();
@@ -596,11 +715,13 @@ function App() {
         readerRef.current = null;
       }
 
+      // 步骤3：等待 readLoop 的 finally 块执行完毕后再关闭端口，避免锁未释放导致 close() 死锁
       if (readLoopPromiseRef.current) {
         await readLoopPromiseRef.current;
         readLoopPromiseRef.current = null;
       }
 
+      // 步骤4：关闭物理串口端口
       if (portRef.current) {
         try {
           await portRef.current.close();
@@ -610,6 +731,7 @@ function App() {
     } catch (err) {
       console.error("Disconnect Error:", err);
     } finally {
+      // 步骤5：无论成功与否，均重置 UI 状态与防重入标志
       setPort(null); setConnected(false); isDisconnectingRef.current = false;
     }
   };
@@ -621,6 +743,7 @@ function App() {
   const setupPort = async (p: SerialPort) => {
     setConnectionError(null);
     setIsConnecting(true);
+    // 打开物理串口（波特率 115200），如果端口已被打开则尝试复用
     try {
       await p.open({ baudRate: 115200 });
     } catch (err: any) {
@@ -639,6 +762,7 @@ function App() {
       }
     }
 
+    // 初始化连接状态，标记端口就绪并清空数据有效标志（等待首个合法帧确认）
     setPort(p);
     portRef.current = p;
     setConnected(true);
@@ -670,12 +794,12 @@ function App() {
       console.error("Failed to send handshake:", e);
     }
 
-    // 等待 MCU 应答帧（最多重试 3 次）
+    // 等待 MCU 应答帧（最多重试 3 次，每次超时 500ms）
     if (p.readable) {
       let ackReceived = false;
       for (let attempt = 0; attempt < 3 && !ackReceived; attempt++) {
         if (attempt > 0) {
-          // 重发握手包
+          // 前一次未收到应答，重发握手包
           console.log(`Handshake retry ${attempt + 1}/3...`);
           try {
             const writer = p.writable?.getWriter();
@@ -686,8 +810,9 @@ function App() {
           const ackReader = p.readable.getReader();
           let ackBuffer = new Uint8Array(0);
           const deadline = Date.now() + 500;
+          // 在 500ms 窗口内持续读取串口数据，拼装并搜索 ACK 帧
           while (Date.now() < deadline) {
-            // 超时控制：用 Promise.race 限制单次 read 等待时间
+            // 超时控制：用 Promise.race 限制单次 read 等待时间，避免无限阻塞
             const readPromise = ackReader.read();
             const timeoutPromise = new Promise<{ value?: Uint8Array; done?: boolean }>((resolve) =>
               setTimeout(() => resolve({ value: undefined, done: false }), Math.max(1, deadline - Date.now()))
@@ -701,20 +826,23 @@ function App() {
             merged.set(ackBuffer);
             merged.set(value, ackBuffer.length);
             ackBuffer = merged;
-            // 扫描 ACK 帧: 55 02 [8B sessionId] [checksum]
+            // 扫描 ACK 应答帧格式: [0x55 帧头] [0x02 应答码] [8B sessionId] [1B 校验和]
             while (ackBuffer.length >= 11) {
+              // 帧头不匹配，滑动到下一个 0x55
               if (ackBuffer[0] !== 0x55 || ackBuffer[1] !== 0x02) {
                 const next55 = ackBuffer.indexOf(0x55, 1);
                 ackBuffer = next55 === -1 ? new Uint8Array(0) : ackBuffer.slice(next55);
                 if (ackBuffer.length < 11) break;
                 continue;
               }
+              // 校验和验证
               let ackChecksum = 0;
               for (let i = 0; i < 10; i++) ackChecksum += ackBuffer[i];
               if ((ackChecksum & 0xFF) !== ackBuffer[10]) {
                 ackBuffer = ackBuffer.slice(1); // 校验失败，跳过当前字节
                 continue;
               }
+              // 比对会话 ID 是否与本次发送的一致
               const ackSid = ackBuffer.slice(2, 10);
               let sidMatch = true;
               for (let i = 0; i < 8; i++) {
@@ -725,10 +853,10 @@ function App() {
                 console.log("Handshake ACK received, session confirmed");
                 break;
               }
-              ackBuffer = ackBuffer.slice(1); // ID 不匹配，跳过
+              ackBuffer = ackBuffer.slice(1); // 会话 ID 不匹配，跳过继续扫描
             }
           }
-          try { ackReader.releaseLock(); } catch (e) {}
+          try { ackReader.releaseLock(); } catch (e) { }
         } catch (e) {
           console.warn("ACK read attempt failed:", e);
         }
@@ -744,10 +872,11 @@ function App() {
       }
     }
 
+    // 握手成功：启动高频数据读取循环
     readLoopPromiseRef.current = readLoop(p);
     console.log("Port connected successfully");
 
-    // Timeout Check for Valid Data Formatting
+    // 数据有效性超时看门狗：3 秒内 readLoop 未解出合法数据帧，则判定为通信异常并自动断连
     if (dataTimeoutRef.current) clearTimeout(dataTimeoutRef.current);
     dataTimeoutRef.current = setTimeout(() => {
       if (portRef.current === p && !hasValidDataRef.current) {
@@ -760,16 +889,20 @@ function App() {
     }, 3000);
   };
 
-  // Robust Auto-Connect and Event Listeners
+  /**
+   * 串口热插拔监听与自动重连：组件挂载时注册 USB 插拔事件，尝试自动匹配历史设备；卸载时清理端口防止 HMR 重载后端口死锁
+   */
   useEffect(() => {
     let mounted = true;
 
+    // USB 设备插入事件：触发自动匹配已知 VID/PID 的设备
     const handleConnect = () => {
       if (!mounted) return;
       console.log("Device connected event detected");
       tryAutoConnect();
     };
 
+    // USB 设备拔出事件：如果拔出的正是当前连接的端口，立即执行断连清理
     const handleDisconnect = (event: any) => {
       console.log("Device disconnected event detected");
       if (portRef.current === event.port) {
@@ -777,8 +910,9 @@ function App() {
       }
     };
 
+    // 自动连接尝试：延迟 500ms 等待操作系统枚举完毕后，检索匹配端口并静默连接
     const tryAutoConnect = async () => {
-      if (portRef.current) return; // Already connected
+      if (portRef.current) return; // 已连接则跳过
       try {
         // Electron 桌面环境中串口枚举可能延迟，等待 500ms 后再尝试
         await new Promise(r => setTimeout(r, 500));
@@ -797,7 +931,7 @@ function App() {
     // @ts-ignore
     navigator.serial.addEventListener('disconnect', handleDisconnect);
 
-    // Initial check
+    // 组件首次挂载时立即尝试一次自动连接
     tryAutoConnect();
 
     return () => {
@@ -807,7 +941,7 @@ function App() {
       // @ts-ignore
       navigator.serial.removeEventListener('disconnect', handleDisconnect);
 
-      // Unmount Cleanup: Close port to prevent "Already Open" on HMR/remount
+      // 组件卸载清理：关闭端口以防止 Vite HMR 热重载时出现 "Already Open" 端口死锁
       if (portRef.current) {
         console.log("Component unmounting, closing port...");
         disconnectSerial();
@@ -815,7 +949,9 @@ function App() {
     };
   }, []);
 
-  // Adaptive scaling for the calibration preview
+  /**
+   * 校准预览自适应缩放：根据当前帧的电压极值动态计算 Y 轴显示范围，使波形始终居中且留有 1.5 倍余量
+   */
   const previewBounds = useMemo(() => {
     if (debugData.length === 0) return { min: 0, max: 100, range: 100 };
     let minVal = Infinity, maxVal = -Infinity;
@@ -829,6 +965,9 @@ function App() {
     return { min: mid - range / 2, max: mid + range / 2, range };
   }, [debugData, globalOffset]);
 
+  /**
+   * 界面国际化文本映射：根据当前语言设置返回对应的中/英文 UI 文案
+   */
   const texts = {
     title: language === 'zh' ? "短路测试仪" : "Short Circuit Tester",
     disconnect: language === 'zh' ? "断开连接" : "DISCONNECT",
@@ -839,6 +978,7 @@ function App() {
     nav_settings: language === 'zh' ? "系统配置" : "SETTINGS",
   };
 
+  // ==================== 第三段：渲染输出（类似 C 的 GUI Draw 绘图） ====================
   return (
     <div className="min-h-screen bg-slate-50 dark:bg-[#020617] text-slate-800 dark:text-slate-200 font-sans flex flex-col overflow-hidden transition-colors duration-300">
       {isConnecting && (

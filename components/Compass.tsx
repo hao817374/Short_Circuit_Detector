@@ -7,67 +7,106 @@ import {
   ArrowUp, ArrowRight, ArrowDown, ArrowLeft, Scale
 } from 'lucide-react';
 
+/**
+ * 罗盘组件属性定义
+ */
 interface CompassProps {
-  data: CompassData;
-  connected: boolean;
-  threshold: number;
-  onThresholdChange: (val: number) => void;
-  thresholdMin: number;
-  thresholdMax: number;
-  thresholdStep: number;
+  data: CompassData;                          // 当前帧的校准后数据（包含原始Q0/Q1、修正后的幅值、方向角等）
+  connected: boolean;                         // 串口是否处于连接状态
+  threshold: number;                          // 目标信号检测阈值（用于判断“在附近”）
+  onThresholdChange: (val: number) => void;   // 灵敏度阈值拖拽修改后的回调函数
+  thresholdMin: number;                       // 滑块允许的最小阈值
+  thresholdMax: number;                       // 滑块允许的最大阈值
+  thresholdStep: number;                      // 滑块拖动时的步长对齐值
 
-  // New: Configuration & Language
-  probeThreshold: number;
-  language: Language;
+  // 系统配置与国际化
+  probeThreshold: number;                     // 探针断开判定阈值（基于未修正的原始数据评估底噪大小）
+  language: Language;                         // 当前界面语言（'zh' | 'en'）
 }
 
-// --- Vertical Slider Component (HUD Style) ---
+// --- 垂直仪表板滑块组件 (HUD 风格) ---
+/**
+ * 垂直滑块组件属性定义
+ */
 interface VerticalSliderProps {
-  value: number;
-  onChange: (v: number) => void;
-  min: number;
-  max: number;
-  step?: number;
-  themeColor: string; // "text-cyan-400" etc
+  value: number;                              // 当前滑块的值
+  onChange: (v: number) => void;              // 滑块数值变化的回调
+  min: number;                                // 滑动范围最小值
+  max: number;                                // 滑动范围最大值
+  step?: number;                              // 步进值（如为 1 则只能调节整数）
+  themeColor: string;                         // UI 主题颜色类名（如 Tailwind 的 "text-cyan-400"）
 }
 
+/**
+ * 垂直仪表板滑块组件 (HUD 风格)
+ * 提供鼠标拖拽 + 触摸滑动两种交互方式，数值以百分比映射到轨道高度，
+ * 视觉上包含填充条、刻度线和可拖拽的滑块手柄。
+ */
 const VerticalSlider: React.FC<VerticalSliderProps> = ({ value, onChange, min, max, step = 1, themeColor }) => {
   const trackRef = useRef<HTMLDivElement>(null);
   const [isDragging, setIsDragging] = useState(false);
 
+  /**
+   * 处理滑块移动事件
+   * 通过鼠标或触摸的 Y 坐标，计算其在整个轨道高度中的百分比位置，
+   * 进而将其线性映射到 [min, max] 的数值区间。
+   * 
+   * @param clientY - 当前触发点的屏幕绝对 Y 坐标
+   */
   const handleMove = (clientY: number) => {
     if (!trackRef.current) return;
     const rect = trackRef.current.getBoundingClientRect();
+
+    // DOM 坐标系下 Y 轴向下递增，而滑块数值是从下向上递增
+    // 因此使用底边坐标减去当前 Y 坐标，得到距离底部的绝对像素高度
     const yFromBottom = rect.bottom - clientY;
     let percentage = yFromBottom / rect.height;
 
+    // 钳制百分比范围，防止鼠标拖出轨道边界导致数值越界
     if (percentage < 0) percentage = 0;
     if (percentage > 1) percentage = 1;
 
+    // 根据百分比线性插值计算实际数值
     let newValue = min + percentage * (max - min);
 
+    // 根据传入的 step 对齐数值（例如 step 为 10 时，结果锁定在 10 的整数倍）
     if (step > 0) {
       newValue = Math.round(newValue / step) * step;
     } else {
       newValue = Math.round(newValue);
     }
 
+    // 二次安全钳制，并触发更新
     newValue = Math.max(min, Math.min(max, newValue));
     onChange(newValue);
   };
 
+  /**
+   * 鼠标按下事件处理
+   * 激活拖拽状态并立即计算首次按下的位置
+   */
   const handleMouseDown = (e: React.MouseEvent) => {
     setIsDragging(true);
     handleMove(e.clientY);
   };
 
+  /**
+   * 移动端触摸事件处理
+   * 激活拖拽状态并获取第一个触点的 Y 坐标
+   */
   const handleTouchStart = (e: React.TouchEvent) => {
     setIsDragging(true);
     handleMove(e.touches[0].clientY);
   };
 
+  /**
+   * 全局拖拽事件监听
+   * 当滑块处于激活状态时，在 window 上挂载移动和松开事件。
+   * 这样即使用户在拖拽过程中鼠标移出了滑块本身的 DOM 区域，依然能持续接收坐标更新。
+   */
   useEffect(() => {
     if (isDragging) {
+      // 封装对应的原生事件处理器
       const moveMouse = (e: MouseEvent) => handleMove(e.clientY);
       const upMouse = () => setIsDragging(false);
       const moveTouch = (e: TouchEvent) => handleMove(e.touches[0].clientY);
@@ -75,9 +114,11 @@ const VerticalSlider: React.FC<VerticalSliderProps> = ({ value, onChange, min, m
 
       window.addEventListener('mousemove', moveMouse);
       window.addEventListener('mouseup', upMouse);
+      // touchmove 必须设置 passive: false，以便在极端情况下能够调用 preventDefault 阻止页面滚动
       window.addEventListener('touchmove', moveTouch, { passive: false });
       window.addEventListener('touchend', upTouch);
 
+      // 组件卸载或拖拽结束时清理全局监听器，防止内存泄漏和事件重复触发
       return () => {
         window.removeEventListener('mousemove', moveMouse);
         window.removeEventListener('mouseup', upMouse);
@@ -87,6 +128,7 @@ const VerticalSlider: React.FC<VerticalSliderProps> = ({ value, onChange, min, m
     }
   }, [isDragging]);
 
+  // 计算滑块填充层的视觉高度百分比
   const percent = Math.max(0, Math.min(1, (value - min) / (max - min))) * 100;
 
   return (
@@ -162,21 +204,35 @@ export const Compass: React.FC<CompassProps> = ({
   }, [data.heading]);
 
   /**
-   * Use dynamic probeThreshold.
-   * Based on uncorrected (raw) data for detection
-   * Also keep safety overload check (> 25000)
+   * 探针连接状态判定：
+   * 1. 正常脱机（底噪）：必须使用未经校准矩阵修正的原始值（rawQ0/rawQ1）进行判定。如果双通道原始值都低于系统配置的 probeThreshold，认为表笔悬空。
+   * 2. 异常溢出（短路或静电）：若原始值突破硬件安全量程（绝对值 > 25000），强制判定为异常断开以保护 UI。
    */
   const isProbeDisconnected = (data.rawQ0 < probeThreshold && data.rawQ1 < probeThreshold) || Math.abs(data.rawQ0) > 25000 || Math.abs(data.rawQ1) > 25000;
 
+  /**
+   * 接近判定：
+   * 校准修正后的总幅值（magnitude）若小于用户动态拉拽的滑块阈值（threshold），说明极度靠近短路点。
+   */
   const isNearby = data.magnitude < threshold;
 
+  /**
+   * 罗盘四态状态机（优先级自上而下）：
+   * 1. offline: 串口物理断开
+   * 2. disconnected: 串口连接但表笔悬空/读数溢出
+   * 3. nearby: 探测到短路点就在附近（达到阈值）
+   * 4. navigating: 正常导航，依据方向角指示短路点相对方位
+   */
   let mode: 'offline' | 'disconnected' | 'nearby' | 'navigating' = 'navigating';
   if (!connected) mode = 'offline';
   else if (isProbeDisconnected) mode = 'disconnected';
   else if (isNearby) mode = 'nearby';
   else mode = 'navigating';
 
-  // 地理方位文字映射：heading 为地理惯例（0°=北/上，顺时针增加）
+  /**
+   * 八向方位导航指令国际化映射
+   * 输入的 data.heading 符合标准罗盘地理惯例：0°=正上方，90°=正右方，顺时针递增。
+   */
   const getMoveInstruction = () => {
     let dirText = "";
     const h = data.heading;
@@ -193,8 +249,14 @@ export const Compass: React.FC<CompassProps> = ({
     return language === 'zh' ? `请向${dirText}移动` : `MOVE ${dirText}`;
   };
 
+  /**
+   * UI 主题与配置字典映射
+   * 根据当前状态机推导出的 mode，动态返回配套的 Tailwind 样式类名、动画、图标和文本。
+   * 这种统一配置的方式避免了在 JSX 中写大量的嵌套三元表达式。
+   */
   const theme = useMemo(() => {
     switch (mode) {
+      // 1. 设备未连接物理串口（灰色冷漠态）
       case 'offline':
         return {
           primary: 'text-slate-500',
@@ -207,6 +269,7 @@ export const Compass: React.FC<CompassProps> = ({
           sub: null,
           gridColor: 'bg-[radial-gradient(#334155_1px,transparent_1px)]',
         };
+      // 2. 表笔悬空或读数溢出（红色警报态，带脉冲动画）
       case 'disconnected':
         return {
           primary: 'text-red-500',
@@ -224,6 +287,7 @@ export const Compass: React.FC<CompassProps> = ({
           sub: null,
           gridColor: 'bg-[radial-gradient(#7f1d1d_1px,transparent_1px)]',
         };
+      // 3. 极度靠近短路点（绿色成功态）
       case 'nearby':
         return {
           primary: 'text-emerald-400',
@@ -236,6 +300,7 @@ export const Compass: React.FC<CompassProps> = ({
           sub: null,
           gridColor: 'bg-[radial-gradient(#065f46_1px,transparent_1px)]',
         };
+      // 4. 正常指向导航中（青色科技态）
       case 'navigating':
       default:
         return {
@@ -244,7 +309,7 @@ export const Compass: React.FC<CompassProps> = ({
           ringStatic: 'border-cyan-500',
           glow: 'shadow-[0_0_15px_rgba(6,182,212,0.2)]',
           bg: 'bg-cyan-950/90',
-          icon: null,
+          icon: null, // 导航模式下中心不显示图标，而是显示方向箭头
           title: getMoveInstruction(),
           sub: `VECTOR MAGNITUDE: ${data.magnitude}`,
           gridColor: 'bg-[radial-gradient(#155e75_1px,transparent_1px)]',
