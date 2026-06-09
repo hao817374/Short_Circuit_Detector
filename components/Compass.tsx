@@ -4,7 +4,7 @@ import { CompassData, Language } from '../types';
 import {
   Unplug, Zap, CheckCircle2, Settings2,
   ArrowUpLeft, ArrowUpRight, ArrowDownLeft, ArrowDownRight,
-  ArrowUp, ArrowRight, ArrowDown, ArrowLeft, Scale
+  ArrowUp, ArrowRight, ArrowDown, ArrowLeft, Scale, Navigation
 } from 'lucide-react';
 
 /**
@@ -318,9 +318,9 @@ export const Compass: React.FC<CompassProps> = ({
           ringStatic: 'border-cyan-500',
           glow: 'shadow-[0_0_15px_rgba(6,182,212,0.2)]',
           bg: 'bg-cyan-950/90',
-          icon: null, // 导航模式下中心不显示图标，而是显示方向箭头
+          icon: <Navigation size={48} className="text-cyan-400 mb-3" />,
           title: getMoveInstruction(),
-          sub: `VECTOR MAGNITUDE: ${data.magnitude}`,
+          sub: null,
           gridColor: 'bg-[radial-gradient(#155e75_1px,transparent_1px)]',
         };
     }
@@ -347,19 +347,7 @@ export const Compass: React.FC<CompassProps> = ({
         <div className="absolute inset-0 opacity-10 bg-[radial-gradient(#94a3b8_1px,transparent_1px)] dark:bg-[radial-gradient(#334155_1px,transparent_1px)] [background-size:24px_24px] pointer-events-none rounded-[3rem]" />
 
         <div className="z-10 w-full h-32 flex flex-col items-center justify-center text-center mb-16 transition-all duration-300">
-          {mode === 'navigating' ? (
-            <>
-              <h2 className="text-3xl sm:text-3xl font-bold text-slate-800 dark:text-slate-100 tracking-tight drop-shadow-sm dark:drop-shadow-lg whitespace-nowrap transition-colors">
-                {theme.title}
-              </h2>
-              <div className="mt-3 px-3 py-1 bg-slate-100 dark:bg-slate-950/50 rounded-full border border-slate-200 dark:border-slate-800/50 shadow-sm transition-colors">
-                <p className="text-[10px] font-mono text-slate-500 dark:text-slate-400 tracking-[0.2em] uppercase transition-colors">
-                  {theme.sub}
-                </p>
-              </div>
-            </>
-          ) : (
-            <div className="flex flex-col items-center animate-in zoom-in-95 duration-300">
+          <div className="flex flex-col items-center animate-in zoom-in-95 duration-300">
               {theme.icon}
               <h2 className="text-3xl sm:text-3xl font-bold text-slate-800 dark:text-slate-100 tracking-tight whitespace-nowrap transition-colors">
                 {theme.title}
@@ -372,7 +360,6 @@ export const Compass: React.FC<CompassProps> = ({
                 </div>
               )}
             </div>
-          )}
         </div>
 
         <div className="relative w-full max-w-[260px] aspect-square flex-shrink-0 flex items-center justify-center z-10 mb-16 transition-all duration-300">
@@ -420,7 +407,7 @@ export const Compass: React.FC<CompassProps> = ({
         </div>
 
         <div className="z-10 w-full flex gap-4 mt-auto">
-          <div className="flex-1 h-16 rounded-xl border border-slate-300 bg-white/80 dark:border-slate-800 dark:bg-slate-950/60 flex flex-col justify-center px-4 relative overflow-hidden group transition-colors">
+          <div className="flex-1 h-16 rounded-xl border border-slate-300 bg-white/80 dark:border-slate-800 dark:bg-slate-950/60 flex flex-col items-center justify-center px-4 relative overflow-hidden group transition-colors">
             <div className="flex justify-between items-center mb-1">
               <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest transition-colors">Q0</span>
             </div>
@@ -430,7 +417,7 @@ export const Compass: React.FC<CompassProps> = ({
             <div className={`absolute bottom-0 left-0 right-0 h-[2px] transition-colors ${connected && !isProbeDisconnected ? 'bg-slate-300 dark:bg-slate-600' : 'bg-slate-300 dark:bg-slate-800'} opacity-50 dark:opacity-30`} />
           </div>
 
-          <div className="flex-1 h-16 rounded-xl border border-slate-300 bg-white/80 dark:border-slate-800 dark:bg-slate-950/60 flex flex-col justify-center px-4 relative overflow-hidden group transition-colors">
+          <div className="flex-1 h-16 rounded-xl border border-slate-300 bg-white/80 dark:border-slate-800 dark:bg-slate-950/60 flex flex-col items-center justify-center px-4 relative overflow-hidden group transition-colors">
             <div className="flex justify-between items-center mb-1">
               <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest transition-colors">Q1</span>
             </div>
@@ -438,6 +425,17 @@ export const Compass: React.FC<CompassProps> = ({
               {connected && !isProbeDisconnected ? data.q1 : "---"}
             </div>
             <div className={`absolute bottom-0 left-0 right-0 h-[2px] transition-colors ${connected && !isProbeDisconnected ? 'bg-slate-300 dark:bg-slate-600' : 'bg-slate-300 dark:bg-slate-800'} opacity-50 dark:opacity-30`} />
+          </div>
+        </div>
+
+        {/* 矢量模长（距离）：Q0/Q1 合成矢量模，数值越小表示越接近短路点 */}
+        <div className="z-10 w-full flex justify-center mt-2">
+          <div className="flex-1 max-w-[280px] h-16 rounded-xl border border-slate-300 bg-white/80 dark:border-slate-800 dark:bg-slate-950/60 flex flex-col items-center justify-center px-4 relative overflow-hidden transition-colors">
+            <span className="text-[9px] font-bold text-slate-400 dark:text-slate-500 uppercase tracking-widest">{language === 'zh' ? '距离' : 'DIST'}</span>
+            <span className={`text-xl font-mono font-bold transition-colors duration-200 ${connected && !isProbeDisconnected ? 'text-cyan-600 dark:text-cyan-400' : 'text-slate-400 dark:text-slate-600'}`}>
+              {connected && !isProbeDisconnected ? data.magnitude : "---"}
+            </span>
+            <div className={`absolute bottom-0 left-0 right-0 h-[2px] transition-colors ${connected && !isProbeDisconnected ? 'bg-cyan-300 dark:bg-cyan-600' : 'bg-slate-300 dark:bg-slate-800'} opacity-50 dark:opacity-30`} />
           </div>
         </div>
 
