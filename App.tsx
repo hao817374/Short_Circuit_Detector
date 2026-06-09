@@ -267,8 +267,14 @@ function App() {
         zeroSamplingBuffer.current.push({ q0: baseQ0, q1: baseQ1 });
       }
 
-      // 阶段3：探头断开检测 — 两通道均低于阈值判定为表笔悬空
-      const isProbeDisconnected = baseQ0 < probeT && baseQ1 < probeT;
+      // 阶段3：计算全帧原始 ADC 极差（max-min），供 Compass 组件辅助表笔断开判定
+      let frameMin = Infinity, frameMax = -Infinity;
+      for (const p of newFrame) {
+        const v = p.value;
+        if (v < frameMin) frameMin = v;
+        if (v > frameMax) frameMax = v;
+      }
+      const frameRange = frameMax - frameMin;
 
       // 阶段4：施加各通道独立偏移补偿，得到 raw 值
       const rawQ0 = baseQ0 + w1Off;
@@ -303,7 +309,8 @@ function App() {
           q0Bit: p1.flag1, q1Bit: p2.flag1,
           // 基于校正后的正切角在映射表中进行最近邻匹配，以输出平滑的罗盘方位
           heading: getNearestHeading(rawAngle, DEFAULT_MAP), magnitude: mag, rawCode: code,
-          status: isProbeDisconnected ? "Disconnected" : "Active",
+          status: baseQ0 < probeT && baseQ1 < probeT ? "Disconnected" : "Active",
+          frameRange: Math.round(frameRange),
           balanceFactor: balanceFactor, axisToCompensate: 'NONE'
         });
       }

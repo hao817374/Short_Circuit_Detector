@@ -20,6 +20,7 @@ export interface CompassData {
   magnitude: number; // 二维空间磁通合成矢量的模长（强度），公式为：sqrt(q0^2 + q1^2)
   rawCode: string; // 原始方波同步码（如 "1010"），结合两个通道的 flag1/flag2 状态进行诊断
   status?: string; // 设备当前状态，通常为 "Active"（连接中）、"Disconnected"（表笔悬空）或 "Waiting"（等待数据）
+  frameRange?: number; // 全帧 100 个原始 ADC 采样点的极差（max-min），用于辅助表笔断开判定
   balanceFactor?: number; // 轴平衡补偿系数，Q1 与 Q0 两通道灵敏度的比值
   axisToCompensate?: 'Q0' | 'Q1' | 'NONE'; // 灵敏度较低的轴（预留字段）
 }

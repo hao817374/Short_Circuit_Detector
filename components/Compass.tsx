@@ -205,16 +205,23 @@ export const Compass: React.FC<CompassProps> = ({
 
   /**
    * 探针连接状态判定：
-   * 1. 正常脱机（底噪）：必须使用未经校准矩阵修正的原始值（rawQ0/rawQ1）进行判定。如果双通道原始值都低于系统配置的 probeThreshold，认为表笔悬空。
-   * 2. 异常溢出（短路或静电）：若原始值突破硬件安全量程（绝对值 > 25000），强制判定为异常断开以保护 UI。
+   * 1. 正常脱机（底噪）：双通道 DSP 均值低于 probeThreshold 阈值
+   * 2. 信号异常波动：全帧原始 ADC 极差（frameRange）超过门限，表明存在有效信号波动而非纯底噪
+   * 3. 硬件溢出保护：原始值突破硬件安全量程（绝对值 > 25000），强制断开以保护 UI
    */
-  const isProbeDisconnected = (data.rawQ0 < probeThreshold && data.rawQ1 < probeThreshold) || Math.abs(data.rawQ0) > 25000 || Math.abs(data.rawQ1) > 25000;
+  const FRAME_RANGE_DISCONNECT = 20000;
+  const isProbeDisconnected = (data.rawQ0 < probeThreshold && data.rawQ1 < probeThreshold)
+    || (data.frameRange !== undefined && data.frameRange > FRAME_RANGE_DISCONNECT)
+    || Math.abs(data.rawQ0) > 25000 || Math.abs(data.rawQ1) > 25000;
 
   /**
    * 接近判定：
    * 校准修正后的总幅值（magnitude）若小于用户动态拉拽的滑块阈值（threshold），说明极度靠近短路点。
    */
   const isNearby = data.magnitude < threshold;
+
+  // 是否因全帧极差异常波动触发表笔断开（区别于底噪过低导致的断开）
+  const isFrameRangeDisconnect = data.frameRange !== undefined && data.frameRange > FRAME_RANGE_DISCONNECT;
 
   /**
    * 罗盘四态状态机（优先级自上而下）：
@@ -284,7 +291,9 @@ export const Compass: React.FC<CompassProps> = ({
             </div>
           ),
           title: language === 'zh' ? '表笔未连接' : 'PROBE DISCONNECTED',
-          sub: null,
+          sub: isFrameRangeDisconnect
+            ? (language === 'zh' ? '请检查表笔测试夹是否接触良好' : 'Check probe clip contact')
+            : null,
           gridColor: 'bg-[radial-gradient(#7f1d1d_1px,transparent_1px)]',
         };
       // 3. 极度靠近短路点（绿色成功态）
@@ -315,7 +324,7 @@ export const Compass: React.FC<CompassProps> = ({
           gridColor: 'bg-[radial-gradient(#155e75_1px,transparent_1px)]',
         };
     }
-  }, [mode, data.magnitude, data.heading, language]);
+  }, [mode, data.magnitude, data.heading, language, isFrameRangeDisconnect]);
 
   return (
     <div className="w-full max-w-[660px] h-full flex flex-row items-stretch justify-center gap-6 px-4">
@@ -356,8 +365,8 @@ export const Compass: React.FC<CompassProps> = ({
                 {theme.title}
               </h2>
               {theme.sub && (
-                <div className="mt-3 px-3 py-1 bg-slate-100 dark:bg-slate-950/50 rounded-full border border-slate-200 dark:border-slate-800/50 shadow-sm transition-colors">
-                  <p className="text-[10px] font-mono opacity-50 tracking-[0.2em] uppercase text-slate-500 dark:text-slate-400 transition-colors">
+                <div className="mt-3 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full shadow-sm transition-colors">
+                  <p className="text-[11px] font-black tracking-widest text-red-500 dark:text-red-400 transition-colors">
                     {theme.sub}
                   </p>
                 </div>
