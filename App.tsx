@@ -8,7 +8,8 @@ import { WelcomeScreen } from './components/WelcomeScreen';
 import { CalibrationView } from './components/CalibrationView';
 import { CompassData, SerialPort, DebugPoint, Language, ThemeMode, POINTS_PER_FRAME } from './types';
 import { scanFrame } from './utils/binaryProtocol';
-import { Usb, PlugZap, Timer, AlertCircle } from 'lucide-react';
+import { Usb, PlugZap, Timer, AlertCircle, HelpCircle } from 'lucide-react';
+import { HelpGuide } from './components/HelpGuide';
 
 type ViewMode = 'COMPASS' | 'CALIBRATION' | 'DEBUG' | 'SETTINGS';
 
@@ -89,6 +90,7 @@ function App() {
   const [isConnecting, setIsConnecting] = useState(false); // 连接中标志：为 true 时在界面弹出全屏毛玻璃加载遮罩，提示用户正在等待设备应答
   const [connectionError, setConnectionError] = useState<string | null>(null); // 连接错误信息：保存串口被占用或握手失败的文字提示，触发底部红色浮动报错框（6秒后自动清空）
   const [skipWelcome, setSkipWelcome] = usePersistentState('cfg_skipWelcome', false); // 引导页跳过标志：持久化存储，若为 true 则开机时不显示 Welcome 引导屏直接进罗盘
+  const [showHelp, setShowHelp] = useState(false); // 帮助引导页面显示控制
   const [isDeveloperMode, setIsDeveloperMode] = usePersistentState('cfg_isDevMode', false); // 开发者模式标志：持久化存储，为 true 时顶部导航条才会解锁显示“调试分析 (DEBUG)”入口
 
   /**
@@ -1011,7 +1013,7 @@ function App() {
         <div className="flex items-center gap-4">
           <div className="w-11 h-11 bg-gradient-to-br from-cyan-500 to-blue-600 rounded-2xl flex items-center justify-center shadow-xl border border-white/10"><Usb className="text-white" size={22} /></div>
           <div>
-            <h1 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight transition-colors duration-300">{texts.title}</h1>
+            <h1 className="text-lg font-black text-slate-800 dark:text-white uppercase tracking-tight transition-colors duration-300">{texts.title}<button onClick={() => setShowHelp(true)} className="inline-flex items-center ml-2 align-middle text-slate-400 hover:text-cyan-500 dark:hover:text-cyan-400 transition-colors"><HelpCircle size={18} /></button></h1>
           </div>
         </div>
         <div className="flex items-center gap-4">
@@ -1162,6 +1164,7 @@ function App() {
           <button onClick={() => setConnectionError(null)} className="text-red-400 hover:text-red-300 ml-2 text-lg leading-none">&times;</button>
         </div>
       )}
+      {showHelp && <HelpGuide language={language} onClose={() => setShowHelp(false)} />}
     </div>
   );
 }

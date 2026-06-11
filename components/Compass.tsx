@@ -215,10 +215,23 @@ export const Compass: React.FC<CompassProps> = ({
     || Math.abs(data.rawQ0) > 25000 || Math.abs(data.rawQ1) > 25000;
 
   /**
-   * 接近判定：
-   * 校准修正后的总幅值（magnitude）若小于用户动态拉拽的滑块阈值（threshold），说明极度靠近短路点。
+   * 接近判定（连续帧防抖）：
+   * magnitude 低于阈值时递增计数器，高于阈值时递减；
+   * 计数器达到 +N 才进入 nearby，降至 -N 才退出，中间区间保持上一状态不变。
    */
-  const isNearby = data.magnitude < threshold;
+  const nearbyCounterRef = useRef(0);
+  const nearbyStateRef = useRef(false); // 记录当前 nearby 状态，仅在计数器达到阈值时翻转
+  const nearbyFrames = 5;
+  const isNearby = (() => {
+    if (data.magnitude < threshold) {
+      nearbyCounterRef.current = Math.min(nearbyCounterRef.current + 1, nearbyFrames);
+    } else {
+      nearbyCounterRef.current = Math.max(nearbyCounterRef.current - 1, -nearbyFrames);
+    }
+    if (nearbyCounterRef.current >= nearbyFrames) nearbyStateRef.current = true;
+    else if (nearbyCounterRef.current <= -nearbyFrames) nearbyStateRef.current = false;
+    return nearbyStateRef.current;
+  })();
 
   // 是否因全帧极差异常波动触发表笔断开（区别于底噪过低导致的断开）
   const isFrameRangeDisconnect = data.frameRange !== undefined && data.frameRange > FRAME_RANGE_DISCONNECT;
@@ -348,18 +361,18 @@ export const Compass: React.FC<CompassProps> = ({
 
         <div className="z-10 w-full h-32 flex flex-col items-center justify-center text-center mb-16 transition-all duration-300">
           <div className="flex flex-col items-center animate-in zoom-in-95 duration-300">
-              {theme.icon}
-              <h2 className="text-3xl sm:text-3xl font-bold text-slate-800 dark:text-slate-100 tracking-tight whitespace-nowrap transition-colors">
-                {theme.title}
-              </h2>
-              {theme.sub && (
-                <div className="mt-3 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full shadow-sm transition-colors">
-                  <p className="text-[11px] font-black tracking-widest text-red-500 dark:text-red-400 transition-colors">
-                    {theme.sub}
-                  </p>
-                </div>
-              )}
-            </div>
+            {theme.icon}
+            <h2 className="text-3xl sm:text-3xl font-bold text-slate-800 dark:text-slate-100 tracking-tight whitespace-nowrap transition-colors">
+              {theme.title}
+            </h2>
+            {theme.sub && (
+              <div className="mt-3 px-3 py-1 bg-red-500/10 border border-red-500/20 rounded-full shadow-sm transition-colors">
+                <p className="text-[11px] font-black tracking-widest text-red-500 dark:text-red-400 transition-colors">
+                  {theme.sub}
+                </p>
+              </div>
+            )}
+          </div>
         </div>
 
         <div className="relative w-full max-w-[260px] aspect-square flex-shrink-0 flex items-center justify-center z-10 mb-16 transition-all duration-300">

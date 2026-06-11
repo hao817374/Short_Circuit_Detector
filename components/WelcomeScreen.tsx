@@ -50,7 +50,7 @@ export const WelcomeScreen: React.FC<WelcomeScreenProps> = ({
                     {language === 'zh' ? '短路测试仪' : 'Short Circuit Tester'}
                 </h2>
                 <p className="mt-2 text-xs text-slate-500 dark:text-slate-500 font-mono tracking-widest uppercase">
-                    Serial Precision Instrument for PCB Analysis
+                    Precision Short Circuit Detector
                 </p>
             </div>
 
