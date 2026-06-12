@@ -734,6 +734,26 @@ function App() {
         readLoopPromiseRef.current = null;
       }
 
+      // 步骤3.5：发送断开通知帧给 MCU，格式与握手帧一致 [0x55] [0x03 会话结束] [8B sessionId] [校验和]
+      // 使 MCU 可校验会话 ID 后停止数据发送，避免串口缓冲区堆积
+      if (portRef.current?.writable && sessionIdRef.current) {
+        try {
+          const byeFrame = new Uint8Array(11);
+          byeFrame[0] = 0x55;
+          byeFrame[1] = 0x03; // 命令码：会话结束
+          byeFrame.set(sessionIdRef.current, 2);
+          let byeChecksum = 0;
+          for (let i = 0; i < 10; i++) byeChecksum += byeFrame[i];
+          byeFrame[10] = byeChecksum & 0xFF;
+          const writer = portRef.current.writable.getWriter();
+          await writer.write(byeFrame);
+          writer.releaseLock();
+          console.log("Disconnect notification sent to MCU");
+        } catch (e) {
+          // 端口可能已不可写，静默忽略
+        }
+      }
+
       // 步骤4：关闭物理串口端口
       if (portRef.current) {
         try {
