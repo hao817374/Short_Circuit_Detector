@@ -7,7 +7,8 @@ import { Settings } from './components/Settings';
 import { WelcomeScreen } from './components/WelcomeScreen';
 import { CalibrationView } from './components/CalibrationView';
 import { CompassData, SerialPort, DebugPoint, Language, ThemeMode, POINTS_PER_FRAME } from './types';
-import { scanFrame } from './utils/binaryProtocol';
+import { scanFrame, scanNotifyFrame } from './utils/binaryProtocol';
+import { LockScreen } from './components/LockScreen';
 import { Usb, PlugZap, Timer, AlertCircle, HelpCircle } from 'lucide-react';
 import { HelpGuide } from './components/HelpGuide';
 
@@ -91,7 +92,10 @@ function App() {
   const [connectionError, setConnectionError] = useState<string | null>(null); // 连接错误信息：保存串口被占用或握手失败的文字提示，触发底部红色浮动报错框（6秒后自动清空）
   const [skipWelcome, setSkipWelcome] = usePersistentState('cfg_skipWelcome', false); // 引导页跳过标志：持久化存储，若为 true 则开机时不显示 Welcome 引导屏直接进罗盘
   const [showHelp, setShowHelp] = useState(false); // 帮助引导页面显示控制
-  const [isDeveloperMode, setIsDeveloperMode] = usePersistentState('cfg_isDevMode', false); // 开发者模式标志：持久化存储，为 true 时顶部导航条才会解锁显示“调试分析 (DEBUG)”入口
+  const [isDeveloperMode, setIsDeveloperMode] = usePersistentState('cfg_isDevMode', false); // 开发者模式标志：持久化存储，为 true 时顶部导航条才会解锁显示”调试分析 (DEBUG)”入口
+  const [isLocked, setIsLocked] = usePersistentState('cfg_isLocked', false); // 软件死锁标志：持久化存储，MCU 发送死锁通知帧后置为 true，关闭软件再打开仍锁定
+  const [lockReason, setLockReason] = usePersistentState<number | null>('cfg_lockReason', null); // 死锁原因码：持久化存储，用于 LockScreen 显示对应错误信息
+  const [activationSent, setActivationSent] = useState(false); // 激活码已发送标志：非持久化，重启即清
 
   /**
    * 连接错误气泡自动清除看门狗：如果产生连接错误，在 6 秒后自动将错误清空，使气泡消失
@@ -593,6 +597,19 @@ function App() {
           merged.set(value, byteBuffer.length);
           byteBuffer = merged;
 
+          // 优先扫描 MCU 死锁通知帧（4 字节短帧，帧头 0x55 ≠ 数据帧头 0xAA）
+          while (byteBuffer.length >= 4) {
+            const notify = scanNotifyFrame(byteBuffer);
+            if (notify) {
+              console.log(`MCU dead-lock notification: reason=0x${notify.reason.toString(16).padStart(2, '0')}`);
+              setIsLocked(true);
+              setLockReason(notify.reason);
+              byteBuffer = byteBuffer.slice(notify.consumed);
+            } else {
+              break;
+            }
+          }
+
           // 循环扫描并解析数据包：单个加密帧的固定长度为 206 字节
           while (byteBuffer.length >= 206) {
             const result = scanFrame(byteBuffer, sessionIdRef.current);
@@ -770,6 +787,34 @@ function App() {
   };
 
   /**
+   * 发送激活码至 MCU：组装 67 字节激活请求帧 [0x55][0x04][64B激活码][校验和]
+   * 激活码为 128 位十六进制字符串（64 字节 HEX），自动补帧头和校验和
+   */
+  const sendActivationCode = async (hexCode: string) => {
+    if (!portRef.current?.writable) return;
+    try {
+      const frame = new Uint8Array(67);
+      frame[0] = 0x55;
+      frame[1] = 0x04; // 命令码：激活请求
+      for (let i = 0; i < 64; i++) {
+        frame[2 + i] = parseInt(hexCode.substring(i * 2, i * 2 + 2), 16);
+      }
+      let cksum = 0;
+      for (let i = 0; i < 66; i++) cksum += frame[i];
+      frame[66] = cksum & 0xFF;
+      const writer = portRef.current.writable.getWriter();
+      await writer.write(frame);
+      writer.releaseLock();
+      setActivationSent(true);
+      setIsLocked(false);      // 清除持久化锁定标志，重启后不再显示锁定弹窗
+      setLockReason(null);
+      console.log('Activation code sent to MCU (67 bytes)');
+    } catch (e) {
+      console.error('Failed to send activation code:', e);
+    }
+  };
+
+  /**
    * 串口配置与启动：打开端口（115200bps）→ 启动 readLoop → 设置数据有效性超时看门狗
    * 3 秒内未收到合法数据帧 → 判定连接失败 → 内联错误横幅 → 自动断开
    */
@@ -801,6 +846,15 @@ function App() {
     setConnected(true);
     keepReadingRef.current = true;
     hasValidDataRef.current = false;
+
+    // 如软件已锁定，MCU 处于死锁状态不会应答握手，跳过握手流程直接启动读取循环
+    if (isLocked) {
+      hasValidDataRef.current = true;
+      setIsConnecting(false);
+      readLoopPromiseRef.current = readLoop(p);
+      console.log("Port connected (locked mode, handshake skipped)");
+      return;
+    }
 
     // 生成 8 字节随机会话 ID，组装 11 字节握手包发送给 MCU
     // 格式: [0x55 帧头] [0x01 命令] [8 字节 Session ID LE] [1 字节校验和]
@@ -1185,6 +1239,16 @@ function App() {
         </div>
       )}
       {showHelp && <HelpGuide language={language} onClose={() => setShowHelp(false)} />}
+      {(isLocked || activationSent) && (
+        <LockScreen
+          language={language}
+          lockReason={lockReason}
+          connected={connected}
+          activationSent={activationSent}
+          onConnect={connectToPort}
+          onSubmitActivation={sendActivationCode}
+        />
+      )}
     </div>
   );
 }

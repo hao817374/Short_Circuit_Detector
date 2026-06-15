@@ -69,3 +69,23 @@ export const scanFrame = (buffer: Uint8Array, sessionId: Uint8Array): { points: 
   // 没找到完整有效帧，保留最后 FRAME_SIZE-1 字节（可能含部分帧头）
   return null;
 };
+
+// MCU 死锁通知帧常量与解析器
+// 帧格式: [0x55 帧头] [0x03 命令码] [1B 原因码] [1B 校验和] = 4 字节
+// 帧头 0x55 区别于数据帧 0xAA，防止与加密载荷混淆
+const NOTIFY_HEADER = 0x55;
+const NOTIFY_CMD = 0x03;
+const NOTIFY_SIZE = 4;
+
+/**
+ * 扫描 MCU 死锁通知帧
+ * 成功返回 { reason: 原因码, consumed: 消耗字节数 }，失败返回 null
+ * 数据帧头 0xAA ≠ 通知帧头 0x55，首字节即可区分，性能无影响
+ */
+export const scanNotifyFrame = (buffer: Uint8Array): { reason: number; consumed: number } | null => {
+  if (buffer.length < NOTIFY_SIZE) return null;
+  if (buffer[0] !== NOTIFY_HEADER || buffer[1] !== NOTIFY_CMD) return null;
+  const cksum = (buffer[0] + buffer[1] + buffer[2]) & 0xFF;
+  if (buffer[3] !== cksum) return null;
+  return { reason: buffer[2], consumed: NOTIFY_SIZE };
+};
